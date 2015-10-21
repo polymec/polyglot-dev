@@ -1,0 +1,34 @@
+------------------------------------------------------------------------------
+Building polyglot requires CMake 2.8.5, found at http://www.cmake.org/, as
+well as GNU make. It also requires you to have polymec 
+(http://bitbucket.org/jjphatt/polymec) built and installed somewhere. To 
+build polyglot on a UNIX-like system, use the following commands:
+
+     $ make config polymec=/path/to/polymec
+     $ make
+
+Installation
+------------
+To install polyglot, run
+
+    $ make install
+
+The default installation prefix is /usr/local. To pick an installation 
+prefix for polyglot pass prefix=[path] to make config. For example,
+
+    $ make config prefix=~/myroot/
+
+will cause polyglot to be installed in ~/myroot/ when make install is run.
+
+Other make commands
+-------------------
+   $ make uninstall 
+          Removes all files installed by 'make install'.
+   
+   $ make clean 
+          Removes all object files but retains the configuration options.
+   
+   $ make distclean 
+          Performs clean and completely removes the build directory.
+
+------------------------------------------------------------------------------

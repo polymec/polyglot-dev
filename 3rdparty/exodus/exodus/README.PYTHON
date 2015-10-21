@@ -1,0 +1,19 @@
+The exodus.py.in file is a python interface or module for accessing
+exodus file data.  It is currently not integrated into any of the
+exodus build systems, but can be used after some simple editting.
+
+The changes needed are:
+0. Build exodus as a shareable library:
+   -- Make sure "-DBUILD_SHARED=ON" is set in cmake-script or given as
+      an option to the cmake process
+   -- Make sure NETCDF_SO_ROOT points to the location of the netcdf 
+      shareable library.
+   -- Set "PYTHON_INSTALL" to the path where the exodus.py module should be
+      installed.
+
+1. Configure and make the exodus libraries:
+      sh cmake-script
+      make
+      make install
+
+2. Documentation can be generated via "python -m pydoc -w exodus"

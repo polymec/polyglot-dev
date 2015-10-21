@@ -1,0 +1,21 @@
+# OS generated files
+.DS_Store
+
+# Editor backup files
+*~
+.*.swp
+
+# Binary files.
+*.pdf
+*.tar.gz
+*.png
+*.dmp
+*.cdl
+
+# Third-party detritis.
+3rdparty/netcdf/nc_test*
+3rdparty/netcdf/ncdap_test*
+
+# Generated files
+build/
+
