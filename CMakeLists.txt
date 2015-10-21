@@ -23,6 +23,13 @@ if (NOT DEFINED POLYMEC_VERSION)
 endif()
 message("-- Found polymec library in ${POLYMEC_PREFIX} (v${POLYMEC_VERSION})")
 
+# Do we have polyamri?
+include(polyamri)
+if (DEFINED POLYAMRI_VERSION)
+  message("-- Found polyamri library in ${POLYMEC_PREFIX} (v${POLYAMRI_VERSION})")
+  set(HAVE_POLYAMRI 1)
+endif()
+
 # Generate polyglot_version.h with the right version numbers.
 add_custom_target(update_version_h ALL
                   python ${POLYMEC_PREFIX}/share/polymec/update_version_h.py polyglot ${POLYGLOT_VERSION} ${PROJECT_BINARY_DIR}/polyglot/polyglot_version.h)
