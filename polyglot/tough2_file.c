@@ -5,87 +5,248 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include "core/array.h"
 #include "core/text_buffer.h"
 #include "core/unordered_map.h"
 #include "polyglot/tough2_file.h"
 
 struct tough2_file_t 
 {
-  string_string_unordered_map_t* blocks;
+  // The "title" of the problem.
+  char title[81];
+
+  // A mapping of names of blocks to their text content.
+  string_ptr_unordered_map_t* blocks;
+
+  // Some useful metadata.
+  int nk, nph;
 
   // Parsing machinery.
   bool valid;
   char error[1024];
 };
 
-static void parse_rocks(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_fixed_length_block(const char* block_name, 
+                                     text_buffer_t* buffer, 
+                                     int* pos, 
+                                     int num_lines, 
+                                     tough2_file_t* file)
 {
+  string_array_t* lines = string_array_new();
+  for (int i = 0; i < num_lines; ++i)
+  {
+    char* line;
+    int line_length;
+    bool found = text_buffer_next(buffer, pos, &line, &line_length);
+    if (!found)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, 
+               "File terminated unexpectedly in %s block.", block_name);
+      break;
+    }
+    string_array_append_with_dtor(lines, string_ndup(line, line_length), string_free);
+  }
+  if (file->valid)
+  {
+    string_array_t** text_p = (string_array_t**)string_ptr_unordered_map_get(file->blocks, (char*)block_name);
+    if (text_p == NULL)
+      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, (char*)block_name, lines, string_free, DTOR(string_array_free));
+    else
+    {
+      // Transfer our lines to the existing entry.
+      for (int i = 0; i < lines->size; ++i)
+        string_array_append_with_dtor(*text_p, lines->data[i], lines->dtors[i]);
+      string_array_release_data_and_free(lines);
+    }
+  }
+  else
+    string_array_free(lines);
 }
 
-static void parse_multi(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_variable_length_block(const char* block_name, 
+                                        text_buffer_t* buffer, 
+                                        int* pos, 
+                                        tough2_file_t* file)
 {
+  string_array_t* lines = string_array_new();
+  char* line;
+  int line_length;
+  bool file_ended = true;
+  while (text_buffer_next(buffer, pos, &line, &line_length))
+  {
+    file_ended = false;
+    if ((line_length == 0) || (strncmp(line, "+++", 3) == 0))
+      break;
+    string_array_append_with_dtor(lines, string_ndup(line, line_length), string_free);
+  }
+  if (file_ended)
+  {
+    file->valid = false;
+    snprintf(file->error, 1023, "File terminated unexpectedly in %s block.", block_name);
+    string_array_free(lines);
+  }
+  else if (string_array_empty(lines))
+  {
+    file->valid = false;
+    snprintf(file->error, 1023, "%s block is empty.", block_name);
+    string_array_free(lines);
+  }
+  else 
+  {
+    string_array_t** text_p = (string_array_t**)string_ptr_unordered_map_get(file->blocks, (char*)block_name);
+    if (text_p == NULL)
+      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, string_dup(block_name), lines, string_free, DTOR(string_array_free));
+    else
+    {
+      // Transfer our lines to the existing entry.
+      for (int i = 0; i < lines->size; ++i)
+        string_array_append_with_dtor(*text_p, lines->data[i], lines->dtors[i]);
+      string_array_release_data_and_free(lines);
+    }
+  }
 }
 
-static void parse_param(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_rocks(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("ROCKS", buffer, pos, file);
 }
 
-static void parse_indom(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_multi(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_fixed_length_block("MULTI", buffer, pos, 1, file);
 }
 
-static void parse_incon(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_param(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_fixed_length_block("PARAM", buffer, pos, 4, file);
 }
 
-static void parse_foft(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_indom(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("INDOM", buffer, pos, file);
 }
 
-static void parse_coft(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_incon(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("INCON", buffer, pos, file);
 }
 
-static void parse_goft(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_foft(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("FOFT", buffer, pos, file);
 }
 
-static void parse_diffu(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_coft(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("COFT", buffer, pos, file);
 }
 
-static void parse_selec(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_goft(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("GOFT", buffer, pos, file);
 }
 
-static void parse_rpcap(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_diffu(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  if (file->nk == -1)
+  {
+    file->valid = false;
+    snprintf(file->error, 1023, "DIFFU block precedes MULTI block.");
+  }
+  else
+    parse_fixed_length_block("DIFFU", buffer, pos, file->nk, file);
 }
 
-static void parse_times(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_selec(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  char* line;
+  int line_length;
+  bool got_header = text_buffer_next(buffer, pos, &line, &line_length);
+  if (!got_header)
+  {
+    file->valid = false;
+    snprintf(file->error, 1023, "File ended unexpectedly in SELEC block.");
+  }
+  else
+  {
+    int ie;
+    int num_matches = sscanf(line, "%5d", &ie);
+    if (num_matches < 1)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Invalid SELEC.1 record.");
+    }
+    else
+    {
+      string_array_t* lines = string_array_new();
+      string_array_append_with_dtor(lines, string_ndup(line, line_length), string_free);
+      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, "SELEC", lines, string_free, DTOR(string_array_free));
+      parse_fixed_length_block("SELEC", buffer, pos, ie, file);
+    }
+  }
 }
 
-static void parse_gener(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_rpcap(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_fixed_length_block("RPCAP", buffer, pos, 2, file);
 }
 
-static void parse_eleme(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_times(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  char* line;
+  int line_length;
+  bool got_header = text_buffer_next(buffer, pos, &line, &line_length);
+  if (!got_header)
+  {
+    file->valid = false;
+    snprintf(file->error, 1023, "File ended unexpectedly in TIMES block.");
+  }
+  else
+  {
+    int iti, ite;
+    double delaf, tinter;
+    int num_matches = sscanf(line, "%5d%5d%10lg%10lg", &iti, &ite, &delaf, &tinter);
+    if (num_matches < 4)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Invalid TIMES.1 record.");
+    }
+    else
+    {
+      string_array_t* lines = string_array_new();
+      string_array_append_with_dtor(lines, string_ndup(line, line_length), string_free);
+      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, "TIMES", lines, string_free, DTOR(string_array_free));
+      parse_fixed_length_block("TIMES", buffer, pos, iti, file);
+    }
+  }
 }
 
-static void parse_conne(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_gener(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("GENER", buffer, pos, file);
 }
 
-static void parse_meshm(text_buffer_t* buffer, tough2_file_t* file)
+static void parse_eleme(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
+  parse_variable_length_block("ELEME", buffer, pos, file);
+}
+
+static void parse_conne(text_buffer_t* buffer, int* pos, tough2_file_t* file)
+{
+  parse_variable_length_block("CONNE", buffer, pos, file);
+}
+
+static void parse_meshm(text_buffer_t* buffer, int* pos, tough2_file_t* file)
+{
+  parse_variable_length_block("MESHM", buffer, pos, file);
 }
 
 tough2_file_t* tough2_file_new(const char* filename)
 {
   tough2_file_t* file = polymec_malloc(sizeof(tough2_file_t));
-  file->blocks = string_string_unordered_map_new();
+  file->blocks = string_ptr_unordered_map_new();
+  file->title[0] = '\0';
   file->valid = true;
   file->error[0] = '\0';
 
@@ -95,42 +256,48 @@ tough2_file_t* tough2_file_new(const char* filename)
   char* line;
   while (text_buffer_next_nonempty(buffer, &pos, &line, &line_length))
   {
+    // Set the title if it's not set yet.
+    if (strlen(file->title) == 0)
+    {
+      strncpy(file->title, line, 80);
+      continue;
+    }
+
+    // Interpret the next block.
     char block[line_length+1];
     string_copy_from_raw(line, line_length, block);
     if (strcasecmp(block, "rocks"))
-      parse_rocks(buffer, file);
+      parse_rocks(buffer, &pos, file);
     else if (strcasecmp(block, "multi"))
-      parse_multi(buffer, file);
+      parse_multi(buffer, &pos, file);
     else if (strcasecmp(block, "param"))
-      parse_param(buffer, file);
+      parse_param(buffer, &pos, file);
     else if (strcasecmp(block, "indom"))
-      parse_indom(buffer, file);
+      parse_indom(buffer, &pos, file);
     else if (strcasecmp(block, "incon"))
-      parse_incon(buffer, file);
+      parse_incon(buffer, &pos, file);
     else if (strcasecmp(block, "foft"))
-      parse_foft(buffer, file);
+      parse_foft(buffer, &pos, file);
     else if (strcasecmp(block, "coft"))
-      parse_coft(buffer, file);
+      parse_coft(buffer, &pos, file);
     else if (strcasecmp(block, "goft"))
-      parse_goft(buffer, file);
+      parse_goft(buffer, &pos, file);
     else if (strcasecmp(block, "diffu"))
-      parse_diffu(buffer, file);
+      parse_diffu(buffer, &pos, file);
     else if (strcasecmp(block, "selec"))
-      parse_selec(buffer, file);
+      parse_selec(buffer, &pos, file);
     else if (strcasecmp(block, "rpcap"))
-      parse_rpcap(buffer, file);
+      parse_rpcap(buffer, &pos, file);
     else if (strcasecmp(block, "times"))
-      parse_times(buffer, file);
+      parse_times(buffer, &pos, file);
     else if (strcasecmp(block, "gener"))
-      parse_gener(buffer, file);
+      parse_gener(buffer, &pos, file);
     else if (strcasecmp(block, "eleme"))
-      parse_eleme(buffer, file);
+      parse_eleme(buffer, &pos, file);
     else if (strcasecmp(block, "conne"))
-      parse_conne(buffer, file);
+      parse_conne(buffer, &pos, file);
     else if (strcasecmp(block, "meshm"))
-      parse_meshm(buffer, file);
-    else 
-      string_string_unordered_map_insert_with_k_dtor(file->blocks, string_dup(block), NULL, string_free);
+      parse_meshm(buffer, &pos, file);
     if (!file->valid)
       break;
   }
@@ -156,14 +323,14 @@ char* tough2_file_error(tough2_file_t* file)
 
 void tough2_file_close(tough2_file_t* file)
 {
-  string_string_unordered_map_free(file->blocks);
+  string_ptr_unordered_map_free(file->blocks);
   polymec_free(file);
 }
 
 bool tough2_file_contains_block(tough2_file_t* file, 
                                 const char* block_name)
 {
-  return string_string_unordered_map_contains(file->blocks, (char*)block_name);
+  return string_ptr_unordered_map_contains(file->blocks, (char*)block_name);
 }
 
 point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
