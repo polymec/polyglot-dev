@@ -80,11 +80,18 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus.a")
     message(FATAL_ERROR "Error building exodus library. See ${CMAKE_CURRENT_BINARY_DIR}/exodus_build*.log for details.")
   endif()
 endif()
-
 if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
   install(FILES ${PROJECT_BINARY_DIR}/lib/libexodus.a DESTINATION lib)
 endif()
 set(POLYGLOT_TP_LIBS exodus;${POLYGLOT_TP_LIBS})
+
+# Build the Lemon parser generator, which we use to generate parsers for 
+# certain troublesome input formats. See the documentation at 
+# http://www.hwaci.com/sw/lemon/lemon.html
+# and the tutorial at 
+# http://souptonuts.sourceforge.net/readme_lemon_tutorial.html
+# for details on usage.
+add_executable(lemon lemon.c)
 
 # Add all the libraries to the build system at large.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${POLYGLOT_TP_C_FLAGS}" PARENT_SCOPE)
