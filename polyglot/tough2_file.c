@@ -15,22 +15,20 @@ struct tough2_file_t
   // The "title" of the problem.
   char title[81];
 
-  // A mapping of names of blocks to their text content.
-  string_ptr_unordered_map_t* blocks;
-
-  // Some useful metadata.
-  int nk, nph;
-
   // Parsing machinery.
   bool valid;
   char error[1024];
+
+  // Data.
+  int nk, nph;
+  point_cloud_t* mesh;
 };
 
-static void parse_fixed_length_block(const char* block_name, 
-                                     text_buffer_t* buffer, 
-                                     int* pos, 
-                                     int num_lines, 
-                                     tough2_file_t* file)
+static string_array_t* fixed_length_block(const char* block_name, 
+                                          text_buffer_t* buffer, 
+                                          int* pos, 
+                                          int num_lines, 
+                                          tough2_file_t* file)
 {
   string_array_t* lines = string_array_new();
   for (int i = 0; i < num_lines; ++i)
@@ -48,26 +46,15 @@ static void parse_fixed_length_block(const char* block_name,
     string_array_append_with_dtor(lines, string_ndup(line, line_length), string_free);
   }
   if (file->valid)
-  {
-    string_array_t** text_p = (string_array_t**)string_ptr_unordered_map_get(file->blocks, (char*)block_name);
-    if (text_p == NULL)
-      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, (char*)block_name, lines, string_free, DTOR(string_array_free));
-    else
-    {
-      // Transfer our lines to the existing entry.
-      for (int i = 0; i < lines->size; ++i)
-        string_array_append_with_dtor(*text_p, lines->data[i], lines->dtors[i]);
-      string_array_release_data_and_free(lines);
-    }
-  }
+    return lines;
   else
     string_array_free(lines);
 }
 
-static void parse_variable_length_block(const char* block_name, 
-                                        text_buffer_t* buffer, 
-                                        int* pos, 
-                                        tough2_file_t* file)
+static string_array_t* variable_length_block(const char* block_name, 
+                                             text_buffer_t* buffer, 
+                                             int* pos, 
+                                             tough2_file_t* file)
 {
   string_array_t* lines = string_array_new();
   char* line;
@@ -93,58 +80,47 @@ static void parse_variable_length_block(const char* block_name,
     string_array_free(lines);
   }
   else 
-  {
-    string_array_t** text_p = (string_array_t**)string_ptr_unordered_map_get(file->blocks, (char*)block_name);
-    if (text_p == NULL)
-      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, string_dup(block_name), lines, string_free, DTOR(string_array_free));
-    else
-    {
-      // Transfer our lines to the existing entry.
-      for (int i = 0; i < lines->size; ++i)
-        string_array_append_with_dtor(*text_p, lines->data[i], lines->dtors[i]);
-      string_array_release_data_and_free(lines);
-    }
-  }
+    return lines;
 }
 
 static void parse_rocks(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("ROCKS", buffer, pos, file);
+  string_array_t* lines = variable_length_block("ROCKS", buffer, pos, file);
 }
 
 static void parse_multi(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_fixed_length_block("MULTI", buffer, pos, 1, file);
+  string_array_t* lines = fixed_length_block("MULTI", buffer, pos, 1, file);
 }
 
 static void parse_param(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_fixed_length_block("PARAM", buffer, pos, 4, file);
+  string_array_t* lines = fixed_length_block("PARAM", buffer, pos, 4, file);
 }
 
 static void parse_indom(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("INDOM", buffer, pos, file);
+  string_array_t* lines = variable_length_block("INDOM", buffer, pos, file);
 }
 
 static void parse_incon(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("INCON", buffer, pos, file);
+  string_array_t* lines = variable_length_block("INCON", buffer, pos, file);
 }
 
 static void parse_foft(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("FOFT", buffer, pos, file);
+  string_array_t* lines = variable_length_block("FOFT", buffer, pos, file);
 }
 
 static void parse_coft(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("COFT", buffer, pos, file);
+  string_array_t* lines = variable_length_block("COFT", buffer, pos, file);
 }
 
 static void parse_goft(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("GOFT", buffer, pos, file);
+  string_array_t* lines = variable_length_block("GOFT", buffer, pos, file);
 }
 
 static void parse_diffu(text_buffer_t* buffer, int* pos, tough2_file_t* file)
@@ -155,7 +131,9 @@ static void parse_diffu(text_buffer_t* buffer, int* pos, tough2_file_t* file)
     snprintf(file->error, 1023, "DIFFU block precedes MULTI block.");
   }
   else
-    parse_fixed_length_block("DIFFU", buffer, pos, file->nk, file);
+  {
+    string_array_t* lines = fixed_length_block("DIFFU", buffer, pos, file->nk, file);
+  }
 }
 
 static void parse_selec(text_buffer_t* buffer, int* pos, tough2_file_t* file)
@@ -179,17 +157,15 @@ static void parse_selec(text_buffer_t* buffer, int* pos, tough2_file_t* file)
     }
     else
     {
-      string_array_t* lines = string_array_new();
-      string_array_append_with_dtor(lines, string_ndup(line, line_length), string_free);
-      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, "SELEC", lines, string_free, DTOR(string_array_free));
-      parse_fixed_length_block("SELEC", buffer, pos, ie, file);
+      string_array_t* lines = fixed_length_block("SELEC", buffer, pos, ie, file);
+      string_array_insert_with_dtor(lines, 0, string_ndup(line, line_length), string_free);
     }
   }
 }
 
 static void parse_rpcap(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_fixed_length_block("RPCAP", buffer, pos, 2, file);
+  string_array_t* lines = fixed_length_block("RPCAP", buffer, pos, 2, file);
 }
 
 static void parse_times(text_buffer_t* buffer, int* pos, tough2_file_t* file)
@@ -214,44 +190,48 @@ static void parse_times(text_buffer_t* buffer, int* pos, tough2_file_t* file)
     }
     else
     {
-      string_array_t* lines = string_array_new();
-      string_array_append_with_dtor(lines, string_ndup(line, line_length), string_free);
-      string_ptr_unordered_map_insert_with_kv_dtors(file->blocks, "TIMES", lines, string_free, DTOR(string_array_free));
-      parse_fixed_length_block("TIMES", buffer, pos, iti, file);
+      string_array_t* lines = fixed_length_block("TIMES", buffer, pos, iti, file);
+      string_array_insert_with_dtor(lines, 0, string_ndup(line, line_length), string_free);
     }
   }
 }
 
 static void parse_gener(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("GENER", buffer, pos, file);
+  string_array_t* lines = variable_length_block("GENER", buffer, pos, file);
 }
 
 static void parse_eleme(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("ELEME", buffer, pos, file);
+  string_array_t* lines = variable_length_block("ELEME", buffer, pos, file);
 }
 
 static void parse_conne(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("CONNE", buffer, pos, file);
+  string_array_t* lines = variable_length_block("CONNE", buffer, pos, file);
 }
 
 static void parse_meshm(text_buffer_t* buffer, int* pos, tough2_file_t* file)
 {
-  parse_variable_length_block("MESHM", buffer, pos, file);
+  string_array_t* lines = variable_length_block("MESHM", buffer, pos, file);
 }
 
 tough2_file_t* tough2_file_new(const char* filename)
 {
   tough2_file_t* file = polymec_malloc(sizeof(tough2_file_t));
-  file->blocks = string_ptr_unordered_map_new();
   file->title[0] = '\0';
   file->valid = true;
   file->error[0] = '\0';
 
   // Open the file and parse the blocks.
   text_buffer_t* buffer = text_buffer_from_file(filename);
+  if (buffer == NULL)
+  {
+    file->valid = false;
+    snprintf(file->error, "Input file '%s' does not exist!", filename);
+    return file;
+  }
+
   int pos = 0, line_length;
   char* line;
   while (text_buffer_next_nonempty(buffer, &pos, &line, &line_length))
@@ -259,8 +239,17 @@ tough2_file_t* tough2_file_new(const char* filename)
     // Set the title if it's not set yet.
     if (strlen(file->title) == 0)
     {
-      strncpy(file->title, line, 80);
-      continue;
+      if (line_length == 0)
+      {
+        file->valid = false;
+        snprintf(file->error, "Input file '%s' has a blank problem title.", filename);
+        break;
+      }
+      else
+      {
+        strncpy(file->title, line, 80);
+        continue;
+      }
     }
 
     // Interpret the next block.
@@ -301,6 +290,12 @@ tough2_file_t* tough2_file_new(const char* filename)
     if (!file->valid)
       break;
   }
+  
+  if (strlen(file->title) == 0)
+  {
+    file->valid = false;
+    snprintf(file->error, "Input file '%s' is empty!", filename);
+  }
 
   text_buffer_free(buffer);
   if (!file->valid)
@@ -323,14 +318,7 @@ char* tough2_file_error(tough2_file_t* file)
 
 void tough2_file_close(tough2_file_t* file)
 {
-  string_ptr_unordered_map_free(file->blocks);
   polymec_free(file);
-}
-
-bool tough2_file_contains_block(tough2_file_t* file, 
-                                const char* block_name)
-{
-  return string_ptr_unordered_map_contains(file->blocks, (char*)block_name);
 }
 
 point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
@@ -339,9 +327,7 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
 
 bool tough2_file_contains_mesh(tough2_file_t* file)
 {
-  return (tough2_file_contains_block(file, "eleme") && 
-          tough2_file_contains_block(file, "conne")) || 
-         tough2_file_contains_block(file, "meshm");
+  return (file->mesh != NULL);
 }
 
 tough2_file_rock_t* tough2_file_read_rocks(tough2_file_t* file, int* num_entries)
