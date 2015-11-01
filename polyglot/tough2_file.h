@@ -71,12 +71,17 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file);
 bool tough2_file_contains_mesh(tough2_file_t* file);
 
 // Parses element-specific initial conditions, returning a newly-allocated
-// array containing values for primary variables in component-minor order,
-// corresponding to the points in the given mesh.
-real_t* tough2_file_read_incon(tough2_file_t* file, point_cloud_t* mesh);
+// map that associates arrays of values for primary variables with elements 
+// whose indices are defined by the given mesh. The records should contain
+// data for the given number of primary variables.
+int_ptr_unordered_map_t* tough2_file_read_incon(tough2_file_t* file, point_cloud_t* mesh, int num_primaries);
 
 // Returns true if the given TOUGH file contains element-specific initial 
 // conditions, false if not.
 bool tough2_file_contains_incon(tough2_file_t* file);
+
+// Returns an internal string containing any error messages resulting from 
+// the parsing process.
+char* tough2_file_error(tough2_file_t* file);
 
 #endif
