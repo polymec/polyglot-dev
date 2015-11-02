@@ -184,6 +184,13 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
   for (int i = 0; i < eleme_lines->size; ++i)
   {
     char* line = eleme_lines->data[i];
+    int line_len = strlen(line);
+    if (line_len < 80)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Error parsing element %d: line truncated at column %d instead of 80.", num_elements, line_len);
+      break;
+    }
     int offset = 0;
 
     // Parse the element name.
@@ -339,6 +346,13 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
   for (int i = 0; i < num_connections; ++i)
   {
     char* line = eleme_lines->data[i];
+    int line_len = strlen(line);
+    if (line_len < 60)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Error parsing connections: line truncated at column %d instead of 60.", line_len);
+      break;
+    }
     int offset = 0;
 
     // Parse the element names.
@@ -404,6 +418,7 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
       continue;
 
     char* line = eleme_lines->data[i];
+    int line_len = strlen(line);
     int offset = 0;
 
     // Record the pair of elements.
@@ -471,6 +486,8 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
     }
     area[k] = (real_t)atof(areax);
 
+    if (line_len < 70) continue;
+
     // Parse BETAX.
     char betax[11];
     strncpy(betax, &line[offset], 10); offset += 10;
@@ -485,6 +502,8 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
       snprintf(file->error, 1023, "Error parsing connection %d: Invalid BETAX.", k);
       break;
     }
+
+    if (line_len < 80) continue;
 
     // Parse SIGX.
     char sigx[11];
@@ -568,7 +587,14 @@ int_ptr_unordered_map_t* tough2_file_read_incon(tough2_file_t* file,
   int num_ics = 0;
   for (int i = 0; i < incon_lines->size/2; ++i)
   {
-    char* line = incon_lines->data[i];
+    char* line = incon_lines->data[2*i];
+    int line_len = strlen(line);
+    if (line_len < 15)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Error parsing connections: line truncated at column %d instead of 15.", line_len);
+      break;
+    }
     int offset = 0;
 
     // Parse the element name.
@@ -644,6 +670,17 @@ int_ptr_unordered_map_t* tough2_file_read_incon(tough2_file_t* file,
     }
     if (!file->valid)
       break;
+
+    // Make sure the second line is long enough.
+    line = incon_lines->data[2*i+1];
+    line_len = strlen(line);
+    if (line_len < 20*num_primaries)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Error parsing connections: line truncated at column %d instead of %d.", line_len, 20*num_primaries);
+      break;
+    }
+    offset = 0;
   }
 
   if (!file->valid)
@@ -678,10 +715,10 @@ int_ptr_unordered_map_t* tough2_file_read_incon(tough2_file_t* file,
     if (string_is_number(nadd_str))
       nadd = atoi(nadd_str);
 
-    // Parse the porosity.
     real_t porosity = 0.0;
-    if (offset < line_len)
+    if (line_len >= 30)
     {
+      // Parse the porosity.
       char porx[16];
       strncpy(porx, &line[offset], 15); offset += 15;
       if (string_is_number(porx))
