@@ -117,7 +117,7 @@ tough2_file_t* tough2_file_new(const char* filename)
   if (!file->valid)
   {
     tough2_file_close(file);
-    polymec_error("%s is not a valid TOUGH2 input file.", filename);
+    polymec_error("%s is not a valid TOUGH2 input file:\n%s", filename, file->error);
   }
 
   return file;
@@ -210,25 +210,46 @@ point_cloud_t* tough2_file_read_mesh(tough2_file_t* file)
       break;
     }
 
-    // Parse the material name and set up tags accordingly.
+    // Parse the material name and tag the element accordingly.
     char ma1[4], ma2[3];
     strncpy(ma1, &line[offset], 3); offset += 3;
     strncpy(ma2, &line[offset], 2); offset += 2;
-    bool ma1_is_blank = true;
-    for (int j = 0; j < 3; ++j)
+    int_array_t* tag = NULL;
+    if (string_is_blank(ma1))
     {
-      if (ma1[j] != ' ')
+      int_array_t** tag_p;
+      if (string_is_blank(ma2))
+        tag_p = (int_array_t**)string_ptr_unordered_map_get(misc_tags, "ROCK0");
+      else
       {
-        ma1_is_blank = false;
-        break;
+        char ma[6];
+        snprintf(ma, 5, "ROCK%s", ma2);
+        tag_p = (int_array_t**)string_ptr_unordered_map_get(misc_tags, ma);
       }
-    }
-    if (ma1_is_blank)
-    {
+
+      if (tag_p == NULL)
+      {
+        tag = int_array_new();
+        string_ptr_unordered_map_insert_with_kv_dtors(misc_tags, string_dup("ROCK0"), tag, string_free, DTOR(int_array_free));
+      }
+      else
+        tag = *tag_p;
     }
     else
     {
+      int_array_t** tag_p;
+      char ma[6];
+      snprintf(ma, 5, "%s%s", ma1, ma2);
+      tag_p = (int_array_t**)string_ptr_unordered_map_get(misc_tags, ma);
+      if (tag_p == NULL)
+      {
+        tag = int_array_new();
+        string_ptr_unordered_map_insert_with_kv_dtors(misc_tags, string_dup(ma), tag, string_free, DTOR(int_array_free));
+      }
+      else
+        tag = *tag_p;
     }
+    int_array_append(tag, i);
 
     // Parse the volume, interface area, permeability modifier.
     char volx_str[11], ahtx_str[11], pmx_str[11];
@@ -543,32 +564,197 @@ int_ptr_unordered_map_t* tough2_file_read_incon(tough2_file_t* file,
     return NULL;
   }
 
-  int num_ics = incon_lines->size/2;
-  int_ptr_unordered_map_t* incon = int_ptr_unordered_map_new();
-  log_debug("tough2_file_read_mesh: Parsing %d initial conditions...", num_ics);
-  for (int i = 0; i < num_ics; ++i)
+  // Count up the element entries (taking into account NSEQ and NADD).
+  int num_ics = 0;
+  for (int i = 0; i < incon_lines->size/2; ++i)
   {
     char* line = incon_lines->data[i];
     int offset = 0;
 
     // Parse the element name.
-    char el[6];
-    strncpy(el, &line[offset], 5); offset += 5;
-
-    int* index_p = string_int_unordered_map_get(elem_index_map, el);
-    if (index_p == NULL)
+    char el[4], ne_str[3];
+    strncpy(el, &line[offset], 3); offset += 3;
+    strncpy(ne_str, &line[offset], 2); offset += 2;
+    if (!string_is_number((const char*)ne_str))
     {
       file->valid = false;
-      snprintf(file->error, 1023, "tough2_file_read_incon: Initial condition %d refers to non-existent element %s.", i, el);
+      snprintf(file->error, 1023, "Error parsing initial condition %d: invalid element name.", num_ics);
       break;
     }
-    int k = *index_p;
-    // FIXME
+    int ne = atoi(ne_str);
+    if (ne < 0)
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Error parsing initial condition %d: invalid element code.", num_ics);
+      break;
+    }
+
+    // Cross-reference it with the mesh.
+    char elem_name[6];
+    snprintf(elem_name, 6, "%s%s", el, ne_str);
+    
+    // Parse the NSEQ, NAD1, and NAD2 values, and reject any non-blank entries!
+    char nseq_str[6], nadd_str[6];
+    strncpy(nseq_str, &line[offset], 5); offset += 5;
+    strncpy(nadd_str, &line[offset], 5); offset += 5;
+    int nseq = 0, nadd = 1;
+    if (string_is_number(nseq_str))
+    {
+      if (nadd <= 0)
+      {
+        file->valid = false;
+        snprintf(file->error, 1023, "Error parsing initial condition %d: NSEQ must be a positive number.", num_ics);
+        break;
+      }
+      if (string_is_number(nadd_str))
+      {
+        nadd = atoi(nadd_str);
+        if (nadd <= 0)
+        {
+          file->valid = false;
+          snprintf(file->error, 1023, "Error parsing initial condition %d: NADD must be a positive number.", num_ics);
+          break;
+        }
+      }
+      else if (!string_is_blank(nadd_str))
+      {
+        file->valid = false;
+        snprintf(file->error, 1023, "Error parsing initial condition %d: NADD must be a number.", num_ics);
+        break;
+      }
+    }
+    else if (!string_is_blank(nseq_str))
+    {
+      file->valid = false;
+      snprintf(file->error, 1023, "Error parsing initial condition %d: NSEQ must be a number.", num_ics);
+      break;
+    }
+
+    for (int j = 0; j <= nseq; ++j, ++num_ics)
+    {
+      char elem_name[6];
+      snprintf(elem_name, 6, "%s%d", el, ne + j*nadd);
+      int* index_p = string_int_unordered_map_get(elem_index_map, elem_name);
+      if (index_p == NULL)
+      {
+        file->valid = false;
+        snprintf(file->error, 1023, "Initial condition %d refers to non-existent element %s.", num_ics, elem_name);
+        break;
+      }
+    }
+    if (!file->valid)
+      break;
+  }
+
+  if (!file->valid)
+    return NULL;
+
+  int_ptr_unordered_map_t* incon = int_ptr_unordered_map_new();
+  real_t* ic_pool = polymec_malloc(sizeof(real_t) * (num_primaries + 1) * num_ics);
+  bool first_var = true;
+  log_debug("tough2_file_read_mesh: Parsing %d initial conditions...", num_ics);
+  int ic = 0;
+  for (int i = 0; i < incon_lines->size/2; ++i)
+  {
+    // Parse the first line.
+    char* line = incon_lines->data[2*i];
+    int line_len = strlen(line);
+    int offset = 0;
+
+    // Parse the element name(s) and find indices.
+    char el[4], ne_str[3];
+    strncpy(el, &line[offset], 3); offset += 3;
+    strncpy(ne_str, &line[offset], 2); offset += 2;
+    int ne = atoi(ne_str);
+    char elem_name[6];
+    snprintf(elem_name, 6, "%s%s", el, ne_str);
+
+    char nseq_str[6], nadd_str[6];
+    strncpy(nseq_str, &line[offset], 5); offset += 5;
+    strncpy(nadd_str, &line[offset], 5); offset += 5;
+    int nseq = 0, nadd = 1;
+    if (string_is_number(nseq_str))
+      nseq = atoi(nseq_str);
+    if (string_is_number(nadd_str))
+      nadd = atoi(nadd_str);
+
+    // Parse the porosity.
+    real_t porosity = 0.0;
+    if (offset < line_len)
+    {
+      char porx[16];
+      strncpy(porx, &line[offset], 15); offset += 15;
+      if (string_is_number(porx))
+      {
+        porosity = (real_t)atof(porx);
+        if ((porosity < 0.0) || (porosity > 1.0))
+        {
+          file->valid = false;
+          snprintf(file->error, 1023, "Error parsing initial condition %d: invalid porosity.", ic);
+          break;
+        }
+      }
+      else if (!string_is_blank(porx))
+      {
+        file->valid = false;
+        snprintf(file->error, 1023, "Error parsing initial condition %d: invalid porosity.", ic);
+        break;
+      }
+    }
+
+    // Parse the second line.
+    line = incon_lines->data[2*i+1];
+    line_len = strlen(line);
+    offset = 0;
+
+    // Primary variables.
+    real_t primaries[num_primaries];
+    for (int p = 0; p < num_primaries; ++p)
+    {
+      char var[21];
+      strncpy(var, &line[offset], 20); offset += 20;
+      if (string_is_number(var))
+        primaries[p] = atof(var);
+      else
+      {
+        file->valid = false;
+        snprintf(file->error, 1023, "Error parsing initial condition %d: invalid primary variable %d.", ic, p);
+        break;
+      }
+    }
+    if (!file->valid)
+      break;
+
+    // Now set things up.
+    for (int j = 0; j <= nseq; ++j, ++ic)
+    {
+      char elem_name[6];
+      snprintf(elem_name, 6, "%s%d", el, ne + j*nadd);
+      int elem = *string_int_unordered_map_get(elem_index_map, elem_name);
+
+      // Copy the data into place.
+      real_t* ic_data = &ic_pool[(num_primaries+1) * ic];
+      for (int p = 0; p < num_primaries; ++p)
+        ic_data[p] = primaries[p];
+      ic_data[num_primaries] = porosity;
+
+      // Insert the data. The first entry into the map gets the privilege of managing memory.
+      if (first_var)
+      {
+        ASSERT(ic_data == ic_pool);
+        int_ptr_unordered_map_insert_with_v_dtor(incon, elem, ic_data, polymec_free);
+        first_var = false;
+      }
+      else
+        int_ptr_unordered_map_insert(incon, elem, ic_data);
+    }
   }
 
   if (!file->valid)
   {
     int_ptr_unordered_map_free(incon);
+    if (first_var)
+      polymec_free(ic_pool);
     incon = NULL;
   }
 
