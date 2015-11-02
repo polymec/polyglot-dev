@@ -1,6 +1,6 @@
 
 # Library.
-add_library(polyglot polyglot.c tough2_file.c cf_file.c)
+add_library(polyglot polyglot.c tough2_file.c nc_cf_file.c)
 
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_TP_LIBRARIES};${POLYMEC_LIBRARIES} PARENT_SCOPE)
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_TP_LIBRARIES};${POLYMEC_LIBRARIES})
