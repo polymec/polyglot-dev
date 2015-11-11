@@ -12,5 +12,5 @@ install(TARGETS polyglot DESTINATION lib)
 
 # Install headers, including generated files.
 file(GLOB HEADERS *.h)
-install(FILES ${HEADERS} DESTINATION include/polyglot)
+install(FILES ${HEADERS} DESTINATION include/polymec/polyglot)
 
