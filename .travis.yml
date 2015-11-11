@@ -1,0 +1,49 @@
+language: c
+
+sudo: required
+
+dist: trusty # Ubuntu 14.04.
+
+compiler:
+  - clang
+  - gcc
+
+env:
+  - DEBUG=0 MPI=0
+  - DEBUG=0 MPI=1
+  - DEBUG=1 MPI=0
+  - DEBUG=1 MPI=1
+
+addons:
+  apt:
+    # Travis whitelist of packages.
+    # https://github.com/travis-ci/apt-package-whitelist/blob/master/ubuntu-trusty
+    packages:
+      - cmake
+      - gcc
+      - clang
+      - libopenmpi-dev
+      - gfortran
+      - wget
+
+  deploy:
+    provider: s3
+    access_key_id: $S3_ACCESS_KEY_ID
+    secret_access_key: $S3_SECRET_KEY
+    bucket: polymec-dev.travis-ci
+    region: us-west-2
+    skip_cleanup: true
+    local_dir: $HOME/latest
+    upload-dir: polyglot-dev
+    acl: public_read
+
+after_success: 
+  - mkdir -p latest 
+  - tar czvf polyglot-$CC-debug=$DEBUG-mpi=$MPI.tar.gz polymec-$CC-debug=$DEBUG-mpi=$MPI/* 
+  - mv polyglot-$CC-debug=$DEBUG-mpi=$MPI.tar.gz latest
+
+script: 
+  - wget https://s3-us-west-2.amazonaws.com/polymec-dev.travis-ci/polymec-dev/polymec-$CC-debug%3D$DEBUG-mpi%3D$MPI.tar.gz
+  - tar xzvf polymec-$CC-debug=$DEBUG-mpi=$MPI.tar.gz
+  - make config polymec="$PWD/polymec-$CC-debug=$DEBUG-mpi=$MPI" && make -j4 install
+
