@@ -24,11 +24,13 @@ endif()
 message("-- Found polymec library in ${POLYMEC_PREFIX} (v${POLYMEC_VERSION})")
 
 # Do we have polyamri?
-include(polyamri)
-if (DEFINED POLYAMRI_VERSION)
-  message("-- Found polyamri library in ${POLYMEC_PREFIX} (v${POLYAMRI_VERSION})")
-  set(HAVE_POLYAMRI 1)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPOLYGLOT_HAVE_POLYAMRI")
+if (EXISTS ${POLYMEC_PREFIX}/share/polymec/polyamri.cmake)
+  include(polyamri)
+  if (DEFINED POLYAMRI_VERSION)
+    message("-- Found polyamri library in ${POLYMEC_PREFIX} (v${POLYAMRI_VERSION})")
+    set(HAVE_POLYAMRI 1)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPOLYGLOT_HAVE_POLYAMRI")
+  endif()
 endif()
 
 # Generate polyglot_version.h with the right version numbers.
