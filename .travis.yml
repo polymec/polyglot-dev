@@ -26,16 +26,21 @@ addons:
       - gfortran
       - wget
 
-  deploy:
-    provider: s3
-    access_key_id: $S3_ACCESS_KEY_ID
-    secret_access_key: $S3_SECRET_KEY
-    bucket: polymec-dev.travis-ci
-    region: us-west-2
-    skip_cleanup: true
-    local_dir: $HOME/latest
-    upload-dir: polyglot-dev
-    acl: public_read
+# This is a workaround for a bug in Travis CI that causes rvm not to be found.
+# (rvm is needed for deployment.)
+before_deploy:
+  - export PATH="$PATH:$HOME/.rvm/bin"
+
+deploy:
+  provider: s3
+  access_key_id: $S3_ACCESS_KEY_ID
+  secret_access_key: $S3_SECRET_KEY
+  bucket: polymec-dev.travis-ci
+  region: us-west-2
+  skip_cleanup: true
+  local_dir: $HOME/latest
+  upload-dir: polyglot-dev
+  acl: public_read
 
 after_success: 
   - mkdir -p latest 
