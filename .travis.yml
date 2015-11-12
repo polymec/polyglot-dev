@@ -38,7 +38,7 @@ deploy:
   bucket: polymec-dev.travis-ci
   region: us-west-2
   skip_cleanup: true
-  local_dir: $HOME/latest
+  local_dir: latest
   upload-dir: polyglot-dev
   acl: public_read
 
