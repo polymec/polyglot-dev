@@ -59,7 +59,7 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus.a")
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt ${exodus_CMakeLists})
  
   message("Configuring exodus library...")
-  execute_process(COMMAND env NETCDF_DIR=${PROJECT_BINARY_DIR} ${CMAKE_COMMAND} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED=OFF 
+  execute_process(COMMAND env NETCDF_DIR=${POLYMEC_PREFIX} ${CMAKE_COMMAND} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED=OFF -DHDF5_LIBRARY=${POLYMEC_HDF5_LIBRARY} -DHDF5HL_LIBRARY=${POLYMEC_HDF5_HL_LIBRARY}
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus
                   OUTPUT_VARIABLE exodus_config_log ERROR_VARIABLE exodus_config_err
                   RESULT_VARIABLE stat)
@@ -91,7 +91,7 @@ set(POLYGLOT_TP_LIBS exodus;${POLYGLOT_TP_LIBS})
 # and the tutorial at 
 # http://souptonuts.sourceforge.net/readme_lemon_tutorial.html
 # for details on usage.
-add_executable(lemon lemon.c)
+#add_executable(lemon lemon.c)
 
 # Add all the libraries to the build system at large.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${POLYGLOT_TP_C_FLAGS}" PARENT_SCOPE)
