@@ -1,11 +1,11 @@
 
 # Library.
-add_library(polyglot polyglot.c tough2_file.c nc_cf_file.c)
+add_library(polyglot polyglot.c tough2_file.c nc_cf_file.c import_tetgen_mesh.c)
 
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_TP_LIBRARIES};${POLYMEC_LIBRARIES} PARENT_SCOPE)
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_TP_LIBRARIES};${POLYMEC_LIBRARIES})
 
-#add_subdirectory(tests)
+add_subdirectory(tests)
 
 # Installation targets.
 install(TARGETS polyglot DESTINATION lib)
