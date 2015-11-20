@@ -1,7 +1,7 @@
 ------------------------------------------------------------------------------
 Building polyglot requires CMake 2.8.5, found at http://www.cmake.org/, as
 well as GNU make. It also requires you to have polymec 
-(http://bitbucket.org/jjphatt/polymec) built and installed somewhere. To 
+(http://github.com/polymec/polymec) built and installed somewhere. To 
 build polyglot on a UNIX-like system, use the following commands:
 
      $ make config polymec=/path/to/polymec
