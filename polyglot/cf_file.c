@@ -5,29 +5,29 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include "polyglot/nc_cf_file.h"
+#include "polyglot/cf_file.h"
 
-struct nc_cf_file_t 
+struct cf_file_t 
 {
   bool valid;
   char error[1024];
 };
 
-nc_cf_file_t* nc_cf_file_new(const char* filename)
+cf_file_t* cf_file_new(const char* filename)
 {
 }
 
-bool nc_cf_file_is_valid(nc_cf_file_t* file)
+bool cf_file_is_valid(cf_file_t* file)
 {
   return file->valid;
 }
 
-char* nc_cf_file_error(nc_cf_file_t* file)
+char* cf_file_error(cf_file_t* file)
 {
   return &file->error[0];
 }
 
-void nc_cf_file_close(nc_cf_file_t* file)
+void cf_file_close(cf_file_t* file)
 {
 }
 
