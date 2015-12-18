@@ -15,6 +15,8 @@ struct cf_file_t
 
 cf_file_t* cf_file_new(const char* filename)
 {
+  cf_file_t* cf = polymec_malloc(sizeof(cf_file_t));
+  return cf;
 }
 
 bool cf_file_is_valid(cf_file_t* file)
