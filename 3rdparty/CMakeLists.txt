@@ -87,9 +87,30 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus.a")
   endif()
 endif()
 if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
+  if (POLYMEC_HAVE_MPI)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/cbind/include/exodusII_par.h DESTINATION lib)
+  endif()
   install(FILES ${PROJECT_BINARY_DIR}/lib/libexodus.a DESTINATION lib)
 endif()
 set(POLYGLOT_TP_LIBS exodus;${POLYGLOT_TP_LIBS})
+
+# Build the Exodus parallel library if we need it.
+if (POLYMEC_HAVE_MPI) 
+  # We need to manually copy the parallel header.
+  execute_process(COMMAND cmake -E copy ${CMAKE_CURRENT_SOURCE_DIR}/exodus/exodus/cbind/include/exodusII_par.h 
+                                        ${PROJECT_BINARY_DIR}/include
+                  RESULT_VARIABLE stat)
+  if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/cbind/include/exodusII_par.h DESTINATION lib)
+  endif()
+
+  # Build an exodus_par library.
+  foreach (src ex_open_par.c;ex_create_par.c)
+    list(APPEND exodus_par_sources ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/cbind/src/${src})
+  endforeach()
+  add_library(exodus_par ${exodus_par_sources})
+  set(POLYGLOT_TP_LIBS exodus_par;${POLYGLOT_TP_LIBS})
+endif()
 
 # Build the Lemon parser generator, which we use to generate parsers for 
 # certain troublesome input formats. See the documentation at 

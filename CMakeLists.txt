@@ -43,6 +43,7 @@ add_subdirectory(3rdparty)
 # Look for headers in the top directory.
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
+include_directories(${PROJECT_BINARY_DIR}/include)
 
 # Look for libraries in these directories.
 link_directories("${POLYMEC_PREFIX}/lib")
