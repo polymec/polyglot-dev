@@ -36,7 +36,15 @@ void exodus_file_write_mesh(exodus_file_t* file,
                             mesh_t* mesh);
 
 // Reads an arbitrary polyhedral mesh from the given Exodus file, returning 
-// a newly-allocated mesh object.
+// a newly-allocated mesh object. Some notes about importing Exodus meshes:
+// 1. Polyhedral and regular finite element meshes are supported.
+// 2. If edges exist within the Exodus file, the edge indexing scheme therein 
+//    is used to construct the mesh returned. Otherwise polyglot will construct 
+//    edges from faces and nodes in the usual manner.
+// 3. Element blocks are read in as cell tags, face blocks as face tags, edge  
+//    blocks as edge tags, and node blocks as node tags. Block names will be 
+//    used for the tags if they exist; otherwise the tags will be named 
+//    "block_N" where N is the (1-based) Exodus block ID.
 mesh_t* exodus_file_read_mesh(exodus_file_t* file);
 
 // Writes a time value to the mesh, returning a newly-created time index 

@@ -98,6 +98,7 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     int num_nodes = mesh_info.num_nodes;
     int num_elem_blocks = mesh_info.num_elem_blk;
     int num_face_blocks = mesh_info.num_face_blk;
+    int num_edge_blocks = mesh_info.num_edge_blk;
 
     // Count the number of cells in the mesh.
     int num_cells = 0, num_ghost_cells = 0;
@@ -105,7 +106,6 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     int elem_counts[num_elem_blocks];
     char elem_types[num_elem_blocks][MAX_NAME_LENGTH];
     int num_nodes_per_elem[num_elem_blocks], 
-        num_edges_per_elem[num_elem_blocks], 
         num_faces_per_elem[num_elem_blocks], 
         num_attr_per_elem[num_elem_blocks];
     for (int elem_block = 1; elem_block <= num_elem_blocks; ++elem_block)
@@ -114,9 +114,8 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
       int status = ex_get_block(file->ex_id, EX_ELEM_BLOCK, elem_block, 
                                 elem_types[block_index], 
                                 &elem_counts[block_index], 
-                                &num_nodes_per_elem[block_index], 
-                                &num_edges_per_elem[block_index], 
-                                &num_faces_per_elem[block_index], 
+                                &num_nodes_per_elem[block_index], NULL,
+                                &num_faces_per_elem[block_index],
                                 &num_attr_per_elem[block_index]);
       if (status < 0)
         return NULL;
@@ -128,9 +127,7 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     int face_counts[num_face_blocks];
     char face_types[num_face_blocks][MAX_NAME_LENGTH];
     int num_nodes_per_face[num_face_blocks], 
-        num_edges_per_face[num_face_blocks],
-        num_attr_per_face[num_face_blocks],
-        dummy;
+        num_attr_per_face[num_face_blocks];
     for (int face_block = 1; face_block <= num_face_blocks; ++face_block)
     {
       int block_index = face_block-1;
@@ -138,9 +135,7 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
                                 face_types[block_index], 
                                 &face_counts[block_index], 
                                 &num_nodes_per_face[block_index], 
-                                &num_edges_per_face[block_index], 
-                                &dummy, 
-                                &num_attr_per_face[block_index]);
+                                NULL, NULL, &num_attr_per_face[block_index]);
       if (status < 0)
         return NULL;
       num_faces += face_counts[face_block-1];
@@ -206,7 +201,58 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     mesh_reserve_connectivity_storage(mesh);
 
     // Now fill in the connectivity.
-    mesh_construct_edges(mesh);
+    for (int elem_block = 1; elem_block <= num_elem_blocks; ++elem_block)
+    {
+      // Fetch the connectivity information. Search first for elem->face 
+      // connectivity.
+      int block_index = elem_block - 1;
+      int offset = mesh->cell_face_offsets[block_index];
+      int tot_num_cell_faces = mesh->cell_face_offsets[block_index+1] - offset;
+      int face_conn[tot_num_cell_faces];
+      int status = ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, NULL, NULL, face_conn);
+      if (status >= 0)
+      {
+        // Great! We have faces for cells. Copy them into place.
+        memcpy(&mesh->cell_faces[offset], face_conn, sizeof(int) * tot_num_cell_faces);
+      }
+      else
+      {
+        // We don't have cell->face connectivity, but we do have cell->node 
+        // connectivity. I guess we have to put on our finite element hat
+        // and construct the faces manually.
+        polymec_error("exodus_file_read_mesh: Nodal finite element meshes are not yet supported.");
+      }
+    }
+    
+    // Face->node connectivity.
+    for (int face_block = 1; face_block <= num_face_blocks; ++face_block)
+    {
+      int block_index = face_block - 1;
+      int offset = mesh->face_node_offsets[block_index];
+      int tot_num_face_nodes = mesh->face_node_offsets[block_index+1] - offset;
+      int node_conn[tot_num_face_nodes];
+      int status = ex_get_conn(file->ex_id, EX_FACE_BLOCK, face_block, node_conn, NULL, NULL);
+      memcpy(&mesh->face_nodes[offset], node_conn, sizeof(int) * tot_num_face_nodes);
+    }
+
+    // Edge->node connectivity.
+    if (num_edge_blocks > 0)
+    {
+      for (int edge_block = 1; edge_block <= num_edge_blocks; ++edge_block)
+      {
+        int block_index = edge_block - 1;
+        int offset = 0; // FIXME
+        int tot_num_edge_nodes = 0; // FIXME
+        int node_conn[tot_num_edge_nodes];
+        int status = ex_get_conn(file->ex_id, EX_EDGE_BLOCK, edge_block, node_conn, NULL, NULL);
+        memcpy(&mesh->edge_nodes[offset], node_conn, sizeof(int) * tot_num_edge_nodes);
+      }
+    }
+    else
+    {
+      // No edge information was found in the mesh, so we create our own.
+      mesh_construct_edges(mesh);
+    }
 
     // Fetch node positions and compute geometry.
     real_t x[num_nodes], y[num_nodes], z[num_nodes];
