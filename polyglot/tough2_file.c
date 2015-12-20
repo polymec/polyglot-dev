@@ -79,9 +79,9 @@ static void parse_tough2_file(const char* filename, tough2_file_t* file)
     string_copy_from_raw(line, line_length, block_name);
 
     // Parse the blocks of interest.
-    if ((strcasecmp(block_name, "incon") == 0) ||
-        (strcasecmp(block_name, "eleme") == 0) ||
-        (strcasecmp(block_name, "conne") == 0))
+    if ((string_casecmp(block_name, "incon") == 0) ||
+        (string_casecmp(block_name, "eleme") == 0) ||
+        (string_casecmp(block_name, "conne") == 0))
     {
       string_array_t* lines = variable_length_block(block_name, buffer, &pos, file);
       if (file->valid)

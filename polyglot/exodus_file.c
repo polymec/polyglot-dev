@@ -149,7 +149,7 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     {
       int block_index = elem_block - 1;
       int num_elem = elem_counts[block_index];
-      if (strcasecmp(elem_types[block_index], "nfaced") == 0)
+      if (string_casecmp(elem_types[block_index], "nfaced") == 0)
       {
         // The cells in this block are polyhedral.
         int elem_face_count[num_elem];
@@ -176,7 +176,7 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     for (int face_block = 1; face_block <= num_face_blocks; ++face_block)
     {
       int block_index = face_block - 1;
-      if (strcasecmp(face_types[block_index], "nsided") == 0)
+      if (string_casecmp(face_types[block_index], "nsided") == 0)
       {
         // The faces in this block are polygonal.
         int num_faces = face_counts[block_index];

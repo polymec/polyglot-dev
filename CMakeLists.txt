@@ -50,7 +50,11 @@ link_directories("${POLYMEC_PREFIX}/lib")
 
 enable_testing()
 
+# Library proper.
 add_subdirectory(polyglot)
+
+# We bundle a mesh generator/editor/importer/exporter.
+add_subdirectory(polymesher)
 
 # Generate a polyglot.cmake file that contains installation information.
 set(CMAKE_INSTALL_PREFIX ${POLYMEC_PREFIX})
