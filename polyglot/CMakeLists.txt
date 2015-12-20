@@ -1,5 +1,5 @@
 # Library.
-add_library(polyglot polyglot.c exodus_file.c cf_file.c 
+add_library(polyglot polyglot.c fe_mesh.c exodus_file.c cf_file.c 
             import_tetgen_mesh.c tough2_file.c)
 
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_TP_LIBRARIES};${POLYMEC_LIBRARIES} PARENT_SCOPE)
