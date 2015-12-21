@@ -5,6 +5,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#include "core/array.h"
 #include "polyglot/exodus_file.h"
 
 #if POLYMEC_HAVE_MPI
@@ -19,7 +20,7 @@ struct exodus_file_t
 {
 #if POLYMEC_HAVE_MPI
   MPI_Comm comm;        // Parallel communicator.
-  MPI_Info mpi_info;    // ???
+  MPI_Info mpi_info;    // Parallel info returned by NetCDF.
 #endif
   int ex_id;            // Exodus file descriptor/identifier.
   float ex_version;     // Exodus database version number.
@@ -27,15 +28,58 @@ struct exodus_file_t
   int last_time_index;  // Index of most-recently added time written to file.
 };
 
+bool exodus_file_query(const char* filename,
+                       int* real_size,
+                       float* version,
+                       int* num_mpi_processes,
+                       real_array_t* times)
+{
+  bool valid = true;
+  int my_real_size = (int)sizeof(real_t);
+  *real_size = 0;
+#if POLYMEC_HAVE_MPI
+  MPI_Info info;
+  int id = ex_open_par(filename, EX_READ, &my_real_size,
+                       real_size, version, 
+                       MPI_COMM_WORLD, info);
+#else
+  int id = ex_open(filename, EX_READ, &my_real_size,
+                   &real_size, &version);
+#endif
+  if (id < 0)
+    valid = false;
+  else
+  {
+    // Query the number of processes for which this file has data.
+    int num_proc_in_file;
+    char file_type[2];
+    ex_get_init_info(id, num_mpi_processes, &num_proc_in_file, file_type);
+    ASSERT(*num_mpi_processes == num_proc_in_file);
+
+    if (times != NULL)
+    {
+      // Ask for the times within the file.
+      int num_times = ex_inquire_int(id, EX_INQ_TIME);
+      real_array_resize(times, num_times);
+      ex_get_all_times(id, times->data);
+    }
+
+    ex_close(id);
+  }
+
+  return valid;
+}
+
 exodus_file_t* exodus_file_new(MPI_Comm comm,
                                const char* filename)
 {
   exodus_file_t* file = polymec_malloc(sizeof(exodus_file_t));
   file->last_time_index = 0;
-#if POLYMEC_HAVE_MPI
-  MPI_Info info;
   file->comm = comm;
   int real_size = (int)sizeof(real_t);
+  file->ex_real_size = 0;
+#if POLYMEC_HAVE_MPI
+  MPI_Info info;
   file->ex_id = ex_open_par(filename, EX_WRITE, &real_size,
                             &file->ex_real_size, &file->ex_version, 
                             file->comm, file->mpi_info);
@@ -80,14 +124,15 @@ void exodus_file_close(exodus_file_t* file)
   ex_close(file->ex_id);
 }
 
-void exodus_file_write_mesh(exodus_file_t* file,
-                            mesh_t* mesh)
+void exodus_file_write_fe_mesh(exodus_file_t* file,
+                               fe_mesh_t* mesh)
 {
 }
 
-mesh_t* exodus_file_read_mesh(exodus_file_t* file)
+fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
 {
-  mesh_t* mesh = NULL;
+  fe_mesh_t* mesh = NULL;
+#if 0
 
   // Get information from the file.
   char title[MAX_LINE_LENGTH];
@@ -100,7 +145,7 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     int num_face_blocks = mesh_info.num_face_blk;
     int num_edge_blocks = mesh_info.num_edge_blk;
 
-    // Count the number of cells in the mesh.
+    // Count the number of elements in the mesh.
     int num_cells = 0, num_ghost_cells = 0;
     // FIXME: Need to get ghost cells somehow?
     int elem_counts[num_elem_blocks];
@@ -268,6 +313,7 @@ mesh_t* exodus_file_read_mesh(exodus_file_t* file)
     return mesh;
   }
   else
+#endif
     return NULL;
 }
 

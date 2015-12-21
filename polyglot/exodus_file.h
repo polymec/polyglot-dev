@@ -8,8 +8,7 @@
 #ifndef POLYGLOT_EXODUS_FILE_H
 #define POLYGLOT_EXODUS_FILE_H
 
-#include "polyglot/polyglot.h"
-#include "core/mesh.h"
+#include "polyglot/fe_mesh.h"
 
 // The Exodus file class provides an interface for reading and writing Exodus II
 // files which are NetCDF files that follow the Exodus II finite element 
@@ -17,6 +16,16 @@
 
 // This type provides the interface for Exodus II files.
 typedef struct exodus_file_t exodus_file_t;
+
+// Queries the Exodus file with the given name, fetching the size of real numbers in the file, 
+// (floating point) version number for the specification, the number of MPI processes for which 
+// it has data, and (if times is non-NULL) an array of times for which the file contains data.
+// Returns true if the given file is a valid Exodus file, false if it is not.
+bool exodus_file_query(const char* filename,
+                       int* real_size,
+                       float* version,
+                       int* num_mpi_processes,
+                       real_array_t* times);
 
 // Creates and opens a new Exodus file for writing simulation data, 
 // returning the Exodus file object. 
@@ -29,23 +38,15 @@ exodus_file_t* exodus_file_open(MPI_Comm comm, const char* filename);
 // Closes and destroys the given Exodus file.
 void exodus_file_close(exodus_file_t* file);
 
-// Writes an arbitrary polyhedral mesh to the given Exodus file, overwriting 
+// Writes a finite element mesh to the given Exodus file, overwriting 
 // any existing mesh there. All cells (or "elements") are written to a single 
 // element block within the Exodus mesh.
-void exodus_file_write_mesh(exodus_file_t* file,
-                            mesh_t* mesh);
+void exodus_file_write_fe_mesh(exodus_file_t* file,
+                               fe_mesh_t* mesh);
 
-// Reads an arbitrary polyhedral mesh from the given Exodus file, returning 
-// a newly-allocated mesh object. Some notes about importing Exodus meshes:
-// 1. Polyhedral and regular finite element meshes are supported.
-// 2. If edges exist within the Exodus file, the edge indexing scheme therein 
-//    is used to construct the mesh returned. Otherwise polyglot will construct 
-//    edges from faces and nodes in the usual manner.
-// 3. Element blocks are read in as cell tags, face blocks as face tags, edge  
-//    blocks as edge tags, and node blocks as node tags. Block names will be 
-//    used for the tags if they exist; otherwise the tags will be named 
-//    "block_N" where N is the (1-based) Exodus block ID.
-mesh_t* exodus_file_read_mesh(exodus_file_t* file);
+// Reads a finite element mesh from the given Exodus file, returning 
+// a newly-allocated object.
+fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file);
 
 // Writes a time value to the mesh, returning a newly-created time index 
 // that can associate field data to this time.
