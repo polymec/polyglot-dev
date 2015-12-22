@@ -16,6 +16,69 @@
 
 #include "exodusII.h"
 
+// This helper function converts the given element identifier string and number of nodes to 
+// our own element enumerated type.
+static fe_element_t get_element_type(const char* elem_type_id, int num_nodes_per_elem)
+{
+  if (string_ncasecmp(elem_type_id, "nfaced", 6) == 0)
+  {
+    ASSERT(num_nodes_per_elem == 0);
+    return FE_POLYHEDRAL;
+  }
+  else if (string_ncasecmp(elem_type_id, "tetra", 5) == 0)
+  {
+    if (num_nodes_per_elem == 4)
+      return FE_TETRAHEDRON_4;
+    else if (num_nodes_per_elem == 8)
+      return FE_TETRAHEDRON_8;
+    else if (num_nodes_per_elem == 10)
+      return FE_TETRAHEDRON_10;
+    else 
+    {
+      ASSERT(num_nodes_per_elem == 14);
+      return FE_TETRAHEDRON_14;
+    }
+  }
+  else if (string_ncasecmp(elem_type_id, "pyramid", 7) == 0)
+  {
+    if (num_nodes_per_elem == 5)
+      return FE_HEXAHEDRON_5;
+    else 
+    {
+      ASSERT(num_nodes_per_elem == 13);
+      return FE_HEXAHEDRON_13;
+    }
+  }
+  else if (string_ncasecmp(elem_type_id, "wedge", 5) == 0)
+  {
+    if (num_nodes_per_elem == 6)
+      return FE_WEDGE_6;
+    else if (num_nodes_per_elem == 15)
+      return FE_WEDGE_15;
+    else 
+    {
+      ASSERT(num_nodes_per_elem == 16);
+      return FE_WEDGE_15;
+    }
+  }
+  else if (string_ncasecmp(elem_type_id, "hex", 3) == 0)
+  {
+    if (num_nodes_per_elem == 8)
+      return FE_HEXAHEDRON_8;
+    else if (num_nodes_per_elem == 9)
+      return FE_HEXAHEDRON_9;
+    else if (num_nodes_per_elem == 20)
+      return FE_HEXAHEDRON_20;
+    else 
+    {
+      ASSERT(num_nodes_per_elem == 27);
+      return FE_HEXAHEDRON_27;
+    }
+  }
+  else
+    return FE_INVALID;
+}
+
 struct exodus_file_t 
 {
 #if POLYMEC_HAVE_MPI
@@ -132,7 +195,6 @@ void exodus_file_write_fe_mesh(exodus_file_t* file,
 fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
 {
   fe_mesh_t* mesh = NULL;
-#if 0
 
   // Get information from the file.
   char title[MAX_LINE_LENGTH];
@@ -145,176 +207,106 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
     int num_face_blocks = mesh_info.num_face_blk;
     int num_edge_blocks = mesh_info.num_edge_blk;
 
-    // Count the number of elements in the mesh.
-    int num_cells = 0, num_ghost_cells = 0;
-    // FIXME: Need to get ghost cells somehow?
-    int elem_counts[num_elem_blocks];
-    char elem_types[num_elem_blocks][MAX_NAME_LENGTH];
-    int num_nodes_per_elem[num_elem_blocks], 
-        num_faces_per_elem[num_elem_blocks], 
-        num_attr_per_elem[num_elem_blocks];
+    // Create the "host" FE mesh.
+    mesh = fe_mesh_new(file->comm, num_nodes);
+
+    // Go over the element blocks and feel out the data.
     for (int elem_block = 1; elem_block <= num_elem_blocks; ++elem_block)
     {
       int block_index = elem_block-1;
+      char elem_type[MAX_NAME_LENGTH];
+      int num_elem, num_nodes_per_elem, num_faces_per_elem;
       int status = ex_get_block(file->ex_id, EX_ELEM_BLOCK, elem_block, 
-                                elem_types[block_index], 
-                                &elem_counts[block_index], 
-                                &num_nodes_per_elem[block_index], NULL,
-                                &num_faces_per_elem[block_index],
-                                &num_attr_per_elem[block_index]);
-      if (status < 0)
-        return NULL;
-      num_cells += elem_counts[block_index];
-    }
+                                elem_type, &num_elem,
+                                &num_nodes_per_elem, NULL,
+                                &num_faces_per_elem, NULL);
 
-    // Count the number of faces in the mesh.
-    int num_faces = 0;
-    int face_counts[num_face_blocks];
-    char face_types[num_face_blocks][MAX_NAME_LENGTH];
-    int num_nodes_per_face[num_face_blocks], 
-        num_attr_per_face[num_face_blocks];
-    for (int face_block = 1; face_block <= num_face_blocks; ++face_block)
-    {
-      int block_index = face_block-1;
-      int status = ex_get_block(file->ex_id, EX_FACE_BLOCK, face_block, 
-                                face_types[block_index], 
-                                &face_counts[block_index], 
-                                &num_nodes_per_face[block_index], 
-                                NULL, NULL, &num_attr_per_face[block_index]);
-      if (status < 0)
-        return NULL;
-      num_faces += face_counts[face_block-1];
-    }
-
-    // Now create the mesh and allocate space for its connectivity.
-    mesh = mesh_new(file->comm, num_cells, num_ghost_cells, num_faces, num_nodes);
-    int cell_index = 0;
-    mesh->cell_face_offsets[0] = 0;
-    for (int elem_block = 1; elem_block <= num_elem_blocks; ++elem_block)
-    {
-      int block_index = elem_block - 1;
-      int num_elem = elem_counts[block_index];
-      if (string_casecmp(elem_types[block_index], "nfaced") == 0)
+      // Get the type of element for this block.
+      fe_element_t elem_type = get_element_type(elem_type, num_nodes_per_elem);
+      fe_block_t* block = NULL;
+      char block_name[MAX_NAME_LENGTH];
+      if (elem_type == FE_POLYHEDRON)
       {
-        // The cells in this block are polyhedral.
-        int elem_face_count[num_elem];
-        int status = ex_get_entity_count_per_polyhedra(file->ex_id, EX_ELEM_BLOCK,
-                                                       elem_block, elem_face_count);
-        if (status < 0)
-          return NULL;
+        // Dig up the face block corresponding to this element block.
+        // FIXME: Do we know that it shares the same ID?
+        int face_block = elem_block;
+        char face_type[MAX_NAME_LENGTH];
+        int num_faces, num_nodes;
+        ex_get_block(file->ex_id, EX_FACE_BLOCK, face_block, face_type, &num_faces,
+                     &num_nodes, NULL, NULL, NULL);
+        if (string_ncasecmp(face_type, "nsided", 6) != 0)
+        {
+          fe_mesh_free(mesh);
+          ex_close(file->ex_id);
+          polymec_error("Invalid face type for polyhedral element block.");
+        }
 
-        // Fill in the cell-face offsets.
-        for (int i = cell_index; i < cell_index + num_elem; ++i)
-          mesh->cell_face_offsets[i+1] = mesh->cell_face_offsets[i] + elem_face_count[i];
+        // Find the number of faces for each element in the block.
+        int* num_elem_faces = polymec_malloc(sizeof(int) * num_elem);
+        ex_get_entity_count_per_polyhedra(file->ex_id, EX_ELEM_BLOCK, elem_block, 
+                                          num_elem_faces);
+
+        // Get the element->face connectivity.
+        int elem_face_size = 0;
+        for (int i = 0; i < num_elem; ++i)
+          elem_face_size += num_elem_faces[i];
+        int* face_nodes = polymec_malloc(sizeof(int) * elem_face_size);
+        ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, NULL, NULL, elem_faces);
+
+        // Find the number of nodes for each face in the block.
+        int* num_face_nodes = polymec_malloc(sizeof(int) * num_faces);
+        ex_get_entity_count_per_polyhedra(file->ex_id, EX_FACE_BLOCK, face_block, 
+                                          num_face_nodes);
+
+        // Get the face->node connectivity.
+        int face_node_size = 0;
+        for (int i = 0; i < num_faces; ++i)
+          face_node_size += num_face_nodes[i];
+        int* face_nodes = polymec_malloc(sizeof(int) * face_node_size);
+        ex_get_conn(file->ex_id, EX_FACE_BLOCK, face_block, face_nodes, NULL, NULL);
+
+        // Create the element block.
+        block = fe_polyhedral_block_new(num_elem, 
+                                        num_elem_faces, elem_faces, 
+                                        num_face_nodes, face_nodes);
+      }
+      else if (elem_type != FE_INVALID)
+      {
+        // Get the element's nodal mapping.
+        int* node_conn = polymec_malloc(sizeof(int) * num_elem * num_nodes_per_elem);
+        ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, node_conn, NULL, NULL);
+        
+        // Build the element block.
+        block = fe_block_new(num_elem, elem_type, node_conn);
       }
       else
       {
-        // Fill in the cell-face offsets.
-        for (int i = cell_index; i < cell_index + num_elem; ++i)
-          mesh->cell_face_offsets[i+1] = mesh->cell_face_offsets[i] + num_faces_per_elem[block_index];
+        fe_mesh_free(mesh);
+        ex_close(file->ex_id);
+        polymec_error("Block %d contains an invalid (3D) element type.", elem_block);
       }
-      cell_index += num_elem;
-    }
 
-    int face_index = 0;
-    mesh->face_node_offsets[0] = 0;
-    for (int face_block = 1; face_block <= num_face_blocks; ++face_block)
-    {
-      int block_index = face_block - 1;
-      if (string_casecmp(face_types[block_index], "nsided") == 0)
-      {
-        // The faces in this block are polygonal.
-        int num_faces = face_counts[block_index];
-        int face_node_count[num_faces];
-        int status = ex_get_entity_count_per_polyhedra(file->ex_id, EX_FACE_BLOCK,
-                                                       face_block, face_node_count);
-        if (status < 0)
-          return NULL;
+      // Fish out the element block name if it has one, or make a default.
+      ex_get_name(file->ex_id, EX_ELEM_BLOCK, elem_block, block_name);
+      if (strlen(block_name) == 0)
+        sprintf(block_name, "block_%d", elem_block);
 
-        // Fill in the face-node offsets.
-        for (int i = face_index; i < face_index + num_faces; ++i)
-          mesh->face_node_offsets[i+1] = mesh->face_node_offsets[i] + face_node_count[i];
-      }
-      else
-      {
-        // Fill in the face-node offsets.
-        for (int i = face_index; i < face_index + num_faces; ++i)
-          mesh->face_node_offsets[i+1] = mesh->face_node_offsets[i] + num_nodes_per_face[block_index];
-      }
-      face_index += num_faces;
-    }
-    mesh_reserve_connectivity_storage(mesh);
-
-    // Now fill in the connectivity.
-    for (int elem_block = 1; elem_block <= num_elem_blocks; ++elem_block)
-    {
-      // Fetch the connectivity information. Search first for elem->face 
-      // connectivity.
-      int block_index = elem_block - 1;
-      int offset = mesh->cell_face_offsets[block_index];
-      int tot_num_cell_faces = mesh->cell_face_offsets[block_index+1] - offset;
-      int face_conn[tot_num_cell_faces];
-      int status = ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, NULL, NULL, face_conn);
-      if (status >= 0)
-      {
-        // Great! We have faces for cells. Copy them into place.
-        memcpy(&mesh->cell_faces[offset], face_conn, sizeof(int) * tot_num_cell_faces);
-      }
-      else
-      {
-        // We don't have cell->face connectivity, but we do have cell->node 
-        // connectivity. I guess we have to put on our finite element hat
-        // and construct the faces manually.
-        polymec_error("exodus_file_read_mesh: Nodal finite element meshes are not yet supported.");
-      }
-    }
-    
-    // Face->node connectivity.
-    for (int face_block = 1; face_block <= num_face_blocks; ++face_block)
-    {
-      int block_index = face_block - 1;
-      int offset = mesh->face_node_offsets[block_index];
-      int tot_num_face_nodes = mesh->face_node_offsets[block_index+1] - offset;
-      int node_conn[tot_num_face_nodes];
-      int status = ex_get_conn(file->ex_id, EX_FACE_BLOCK, face_block, node_conn, NULL, NULL);
-      memcpy(&mesh->face_nodes[offset], node_conn, sizeof(int) * tot_num_face_nodes);
-    }
-
-    // Edge->node connectivity.
-    if (num_edge_blocks > 0)
-    {
-      for (int edge_block = 1; edge_block <= num_edge_blocks; ++edge_block)
-      {
-        int block_index = edge_block - 1;
-        int offset = 0; // FIXME
-        int tot_num_edge_nodes = 0; // FIXME
-        int node_conn[tot_num_edge_nodes];
-        int status = ex_get_conn(file->ex_id, EX_EDGE_BLOCK, edge_block, node_conn, NULL, NULL);
-        memcpy(&mesh->edge_nodes[offset], node_conn, sizeof(int) * tot_num_edge_nodes);
-      }
-    }
-    else
-    {
-      // No edge information was found in the mesh, so we create our own.
-      mesh_construct_edges(mesh);
+      // Add the element block to the mesh.
+      fe_mesh_add_block(mesh, block_name, block);
     }
 
     // Fetch node positions and compute geometry.
     real_t x[num_nodes], y[num_nodes], z[num_nodes];
     ex_get_coord(file->ex_id, x, y, z);
+    point_t* X = fe_mesh_node_coordinates(mesh);
     for (int n = 0; n < mesh->num_nodes; ++n)
     {
-      mesh->nodes[n].x = x[n];
-      mesh->nodes[n].y = y[n];
-      mesh->nodes[n].z = z[n];
+      X[n].x = x[n];
+      X[n].y = y[n];
+      X[n].z = z[n];
     }
-    mesh_compute_geometry(mesh);
-
-    return mesh;
   }
-  else
-#endif
-    return NULL;
+  return mesh;
 }
 
 int exodus_file_write_time(exodus_file_t* file, real_t time)

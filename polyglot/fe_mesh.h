@@ -15,6 +15,7 @@
 // This type identifies the various types of (3D) finite elements in an fe_mesh.
 typedef enum
 {
+  FE_INVALID,
   FE_TETRAHEDRON_4, 
   FE_TETRAHEDRON_8, 
   FE_TETRAHEDRON_10, 
@@ -31,27 +32,18 @@ typedef enum
   FE_POLYHEDRON
 } fe_mesh_element_t;
 
-// This type identifies the various types of (2D) faces that separate elements 
-// in an fe_mesh.
-typedef enum
-{
-  FE_QUADRILATERAL,
-  FE_TRIANGLE,
-  FE_POLYGON
-} fe_mesh_face_t;
-
 // This type represents a block of finite elements consisting of a single 
 // given type. Element blocks can be used to construct or edit finite element 
-// meshes. Note that elements are numbered from 0 to N­1 within an N-element 
+// meshes. Note that elements are numbered from 0 to N-1 within an N-element 
 // block, but that the index spaces of faces, edges, and nodes exist within 
 // the context of the entire underlying fe_mesh.
 typedef struct fe_block_t fe_block_t;
 
 // Constructs a new finite element block of the given non-polyhedral type 
-// (FE_TETRAHEDRON, FE_PYRAMID, FE_WEDGE, FE_HEXAHEDRON, but not FE_POLYHEDRON)
 // by specifying the nodes that make up each element. elem_node_indices 
 // is an array that lists the node indices for each element, in order. The 
-// number of nodes per element is defined by the element type.
+// number of nodes per element is defined by the element type. The elem_node_indices
+// array is consumed by this function.
 fe_block_t* fe_block_new(int num_elements,
                          fe_mesh_element_t type,
                          int* elem_node_indices);
@@ -62,10 +54,10 @@ fe_block_t* fe_block_new(int num_elements,
 // number of faces attached to each element in the block; face_types is an 
 // array of types for the faces of each element; face_node_indices is an 
 // array that lists the node indices for each face, in order, defined by the 
-// face type.
+// face type. All arrays are consumed by this function.
 fe_block_t* fe_polyhedral_block_new(int num_elements,
                                     int* num_elem_faces,
-                                    fe_mesh_face_t* elem_face_types,
+                                    int* num_face_nodes,
                                     int* face_node_indices);
 
 // Destroys the given finite element block.
