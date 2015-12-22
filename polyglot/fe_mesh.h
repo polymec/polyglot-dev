@@ -57,6 +57,7 @@ fe_block_t* fe_block_new(int num_elements,
 // face type. All arrays are consumed by this function.
 fe_block_t* fe_polyhedral_block_new(int num_elements,
                                     int* num_elem_faces,
+                                    int* elem_face_indices,
                                     int* num_face_nodes,
                                     int* face_node_indices);
 

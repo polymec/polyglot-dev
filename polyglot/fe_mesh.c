@@ -13,7 +13,6 @@ struct fe_block_t
   int num_elem;
   fe_mesh_element_t elem_type;
 
-  fe_mesh_face_t* elem_face_types;
   int num_elem_faces;
   int* elem_face_offsets;
   int* elem_faces;
@@ -41,12 +40,14 @@ fe_block_t* fe_block_new(int num_elements,
 
 fe_block_t* fe_polyhedral_block_new(int num_elements,
                                     int* num_elem_faces,
-                                    fe_mesh_face_t* elem_face_types,
+                                    int* elem_face_indices,
+                                    int* num_face_nodes,
                                     int* face_node_indices)
 {
   ASSERT(num_elements > 0);
   ASSERT(num_elem_faces != NULL);
-  ASSERT(elem_face_types != NULL);
+  ASSERT(elem_face_indices != NULL);
+  ASSERT(num_face_nodes != NULL);
   ASSERT(face_node_indices != NULL);
   fe_block_t* block = polymec_malloc(sizeof(fe_block_t));
   block->num_elem = num_elements;

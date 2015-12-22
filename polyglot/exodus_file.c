@@ -18,12 +18,12 @@
 
 // This helper function converts the given element identifier string and number of nodes to 
 // our own element enumerated type.
-static fe_element_t get_element_type(const char* elem_type_id, int num_nodes_per_elem)
+static fe_mesh_element_t get_element_type(const char* elem_type_id, int num_nodes_per_elem)
 {
   if (string_ncasecmp(elem_type_id, "nfaced", 6) == 0)
   {
     ASSERT(num_nodes_per_elem == 0);
-    return FE_POLYHEDRAL;
+    return FE_POLYHEDRON;
   }
   else if (string_ncasecmp(elem_type_id, "tetra", 5) == 0)
   {
@@ -42,11 +42,11 @@ static fe_element_t get_element_type(const char* elem_type_id, int num_nodes_per
   else if (string_ncasecmp(elem_type_id, "pyramid", 7) == 0)
   {
     if (num_nodes_per_elem == 5)
-      return FE_HEXAHEDRON_5;
+      return FE_PYRAMID_5;
     else 
     {
       ASSERT(num_nodes_per_elem == 13);
-      return FE_HEXAHEDRON_13;
+      return FE_PYRAMID_13;
     }
   }
   else if (string_ncasecmp(elem_type_id, "wedge", 5) == 0)
@@ -214,15 +214,15 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
     for (int elem_block = 1; elem_block <= num_elem_blocks; ++elem_block)
     {
       int block_index = elem_block-1;
-      char elem_type[MAX_NAME_LENGTH];
+      char elem_type_name[MAX_NAME_LENGTH];
       int num_elem, num_nodes_per_elem, num_faces_per_elem;
       int status = ex_get_block(file->ex_id, EX_ELEM_BLOCK, elem_block, 
-                                elem_type, &num_elem,
+                                elem_type_name, &num_elem,
                                 &num_nodes_per_elem, NULL,
                                 &num_faces_per_elem, NULL);
 
       // Get the type of element for this block.
-      fe_element_t elem_type = get_element_type(elem_type, num_nodes_per_elem);
+      fe_mesh_element_t elem_type = get_element_type(elem_type_name, num_nodes_per_elem);
       fe_block_t* block = NULL;
       char block_name[MAX_NAME_LENGTH];
       if (elem_type == FE_POLYHEDRON)
@@ -250,7 +250,7 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
         int elem_face_size = 0;
         for (int i = 0; i < num_elem; ++i)
           elem_face_size += num_elem_faces[i];
-        int* face_nodes = polymec_malloc(sizeof(int) * elem_face_size);
+        int* elem_faces = polymec_malloc(sizeof(int) * elem_face_size);
         ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, NULL, NULL, elem_faces);
 
         // Find the number of nodes for each face in the block.
@@ -299,7 +299,7 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
     real_t x[num_nodes], y[num_nodes], z[num_nodes];
     ex_get_coord(file->ex_id, x, y, z);
     point_t* X = fe_mesh_node_coordinates(mesh);
-    for (int n = 0; n < mesh->num_nodes; ++n)
+    for (int n = 0; n < num_nodes; ++n)
     {
       X[n].x = x[n];
       X[n].y = y[n];
