@@ -266,9 +266,7 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
         ex_get_conn(file->ex_id, EX_FACE_BLOCK, face_block, face_nodes, NULL, NULL);
 
         // Create the element block.
-        block = fe_polyhedral_block_new(num_elem, 
-                                        num_elem_faces, elem_faces, 
-                                        num_face_nodes, face_nodes);
+        block = fe_polyhedral_block_new(num_elem, num_elem_faces, elem_faces);
       }
       else if (elem_type != FE_INVALID)
       {

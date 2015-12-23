@@ -13,45 +13,93 @@ struct fe_block_t
   int num_elem;
   fe_mesh_element_t elem_type;
 
-  int num_elem_faces;
   int* elem_face_offsets;
   int* elem_faces;
 
-  int num_elem_nodes;
   int* elem_node_offsets;
   int* elem_nodes;
 
-  int num_elem_edges;
   int* elem_edge_offsets;
   int* elem_edges;
 };
 
-fe_block_t* fe_block_new(int num_elements,
+static int get_num_elem_nodes(fe_mesh_element_t elem_type)
+{
+  switch(elem_type)
+  {
+    case FE_TETRAHEDRON_4: return 4;
+    case FE_PYRAMID_5: return 5;
+    case FE_WEDGE_6: return 6;
+    case FE_TETRAHEDRON_8:
+    case FE_HEXAHEDRON_8: return 8;
+    case FE_HEXAHEDRON_9: return 9;
+    case FE_TETRAHEDRON_10: return 10;
+    case FE_PYRAMID_13: return 13;
+    case FE_TETRAHEDRON_14: return 14;
+    case FE_WEDGE_15: return 15;
+    case FE_HEXAHEDRON_20: return 20;
+    case FE_HEXAHEDRON_27: return 27;
+    default: return -1;
+  }
+}
+
+fe_block_t* fe_block_new(int num_elem,
                          fe_mesh_element_t type,
                          int* elem_node_indices)
 {
-  ASSERT(num_elements > 0);
+  ASSERT(num_elem > 0);
   ASSERT(elem_node_indices != NULL);
   fe_block_t* block = polymec_malloc(sizeof(fe_block_t));
-  block->num_elem = num_elements;
+  block->num_elem = num_elem;
   block->elem_type = type;
+
+  // Element nodes.
+  int num_elem_nodes = get_num_elem_nodes(type);
+  block->elem_node_offsets = polymec_malloc(sizeof(int) * num_elem_nodes * num_elem);
+  block->elem_node_offsets[0] = 0;
+  for (int i = 0; i < num_elem; ++i)
+    block->elem_node_offsets[i+1] = block->elem_node_offsets[i] + num_elem_nodes;
+  block->elem_nodes = elem_node_indices;
+
+  // Elements don't understand their faces.
+  block->elem_face_offsets = NULL;
+  block->elem_faces = NULL;
+
+  block->elem_edge_offsets = NULL;
+  block->elem_edges = NULL;
+
   return block;
 }
 
-fe_block_t* fe_polyhedral_block_new(int num_elements,
+fe_block_t* fe_polyhedral_block_new(int num_elem,
                                     int* num_elem_faces,
-                                    int* elem_face_indices,
-                                    int* num_face_nodes,
-                                    int* face_node_indices)
+                                    int* elem_face_indices)
 {
-  ASSERT(num_elements > 0);
+  ASSERT(num_elem > 0);
   ASSERT(num_elem_faces != NULL);
   ASSERT(elem_face_indices != NULL);
-  ASSERT(num_face_nodes != NULL);
-  ASSERT(face_node_indices != NULL);
   fe_block_t* block = polymec_malloc(sizeof(fe_block_t));
-  block->num_elem = num_elements;
+  block->num_elem = num_elem;
   block->elem_type = FE_POLYHEDRON;
+
+  // Element faces.
+  int tot_elem_faces = 0;
+  for (int i = 0; i < num_elem; ++i)
+    tot_elem_faces += num_elem_faces[i];
+  block->elem_face_offsets = polymec_malloc(sizeof(int) * tot_elem_faces);
+  block->elem_face_offsets[0] = 0;
+  for (int i = 0; i < num_elem; ++i)
+    block->elem_face_offsets[i+1] = block->elem_face_offsets[i] + num_elem_faces[i];
+  polymec_free(num_elem_faces);
+  block->elem_faces = elem_face_indices;
+
+  // Element nodes are not determined until the block is added to the mesh.
+  block->elem_node_offsets = NULL;
+  block->elem_nodes = NULL;
+
+  block->elem_edge_offsets = NULL;
+  block->elem_edges = NULL;
+
   return block;
 }
 

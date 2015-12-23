@@ -44,7 +44,7 @@ typedef struct fe_block_t fe_block_t;
 // is an array that lists the node indices for each element, in order. The 
 // number of nodes per element is defined by the element type. The elem_node_indices
 // array is consumed by this function.
-fe_block_t* fe_block_new(int num_elements,
+fe_block_t* fe_block_new(int num_elem,
                          fe_mesh_element_t type,
                          int* elem_node_indices);
 
@@ -55,11 +55,9 @@ fe_block_t* fe_block_new(int num_elements,
 // array of types for the faces of each element; face_node_indices is an 
 // array that lists the node indices for each face, in order, defined by the 
 // face type. All arrays are consumed by this function.
-fe_block_t* fe_polyhedral_block_new(int num_elements,
+fe_block_t* fe_polyhedral_block_new(int num_elem,
                                     int* num_elem_faces,
-                                    int* elem_face_indices,
-                                    int* num_face_nodes,
-                                    int* face_node_indices);
+                                    int* elem_face_indices);
 
 // Destroys the given finite element block.
 void fe_block_free(fe_block_t* block);
