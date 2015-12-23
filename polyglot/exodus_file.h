@@ -61,109 +61,81 @@ bool exodus_file_next_time(exodus_file_t* file,
                            int* time_index,
                            real_t* time);
 
-// Writes a named scalar cell-centered field to the given Exodus file, 
+// Writes a named element field to the given Exodus file, 
 // associated it the time identified by the given time index.
-void exodus_file_write_scalar_cell_field(exodus_file_t* file,
-                                         int time_index,
-                                         const char* field_name,
-                                         real_t* field_data);
-
-// Reads a named scalar cell-centered field from the Exodus file, 
-// returning a newly-allocated array of field data associated with the time 
-// for the given time index.
-real_t* exodus_file_read_scalar_cell_field(exodus_file_t* file,
-                                           int time_index,
-                                           const char* field_name);
-
-// Writes a named multicomponent cell-centered field, to the given Exodus file. 
-// The field data is interpreted to be in component-minor order and is associated
-// with the time identified by the given time index..
-void exodus_file_write_cell_field(exodus_file_t* file,
-                                  int time_index,
-                                  const char** field_component_names,
-                                  real_t* field_data,
-                                  int num_components);
-
-// Reads a named multicomponent cell-centered field from the Exodus file, returning a 
-// newly-allocated array of field data for the given time index.
-real_t* exodus_file_read_cell_field(exodus_file_t* file,
-                                    int time_index,
-                                    const char** field_component_names,
-                                    int num_components);
-
-// Returns true if the given Exodus file contains a (scalar) cell-centered field 
-// with the given name and associated with the given time index, false otherwise.
-bool exodus_file_contains_cell_field(exodus_file_t* file, 
+void exodus_file_write_element_field(exodus_file_t* file,
                                      int time_index,
-                                     const char* field_name);
+                                     const char* field_name,
+                                     real_t* field_data);
 
-// Writes a named scalar face-centered field to the given Exodus file, 
-// associated it the time identified by the given time index.
-void exodus_file_write_scalar_face_field(exodus_file_t* file,
-                                         int time_index,
-                                         const char* field_name,
-                                         real_t* field_data);
-
-// Reads a named scalar face-centered field from the Exodus file, 
+// Reads a named element field from the Exodus file, 
 // returning a newly-allocated array of field data associated with the time 
 // for the given time index.
-real_t* exodus_file_read_scalar_face_field(exodus_file_t* file,
-                                           int time_index,
-                                           const char* field_name);
+real_t* exodus_file_read_element_field(exodus_file_t* file,
+                                       int time_index,
+                                       const char* field_name);
 
-// Writes a named multicomponent face-centered field, to the given Exodus file. 
-// The field data is interpreted to be in component-minor order and is associated
-// with the time identified by the given time index..
+// Returns true if the given Exodus file contains a element field 
+// with the given name and associated with the given time index, false otherwise.
+bool exodus_file_contains_element_field(exodus_file_t* file, 
+                                        int time_index,
+                                        const char* field_name);
+
+// Writes a named face field to the given Exodus file, 
+// associated it the time identified by the given time index.
 void exodus_file_write_face_field(exodus_file_t* file,
                                   int time_index,
-                                  const char** field_component_names,
-                                  real_t* field_data,
-                                  int num_components);
+                                  const char* field_name,
+                                  real_t* field_data);
 
-// Reads a named multicomponent face-centered field from the Exodus file, returning a 
-// newly-allocated array of field data for the given time index.
+// Reads a named face field from the Exodus file, 
+// returning a newly-allocated array of field data associated with the time 
+// for the given time index.
 real_t* exodus_file_read_face_field(exodus_file_t* file,
                                     int time_index,
-                                    const char** field_component_names,
-                                    int num_components);
+                                    const char* field_name);
 
-// Returns true if the given Exodus file contains a (scalar) face-centered field 
+// Returns true if the given Exodus file contains a face field 
 // with the given name and associated with the given time index, false otherwise.
 bool exodus_file_contains_face_field(exodus_file_t* file, 
                                      int time_index,
                                      const char* field_name);
 
-// Writes a named scalar node-centered field to the given Exodus file, 
+// Writes a named edge field to the given Exodus file, 
 // associated it the time identified by the given time index.
-void exodus_file_write_scalar_node_field(exodus_file_t* file,
-                                         int time_index,
-                                         const char* field_name,
-                                         real_t* field_data);
+void exodus_file_write_edge_field(exodus_file_t* file,
+                                  int time_index,
+                                  const char* field_name,
+                                  real_t* field_data);
 
-// Reads a named scalar node-centered field from the Exodus file, 
+// Reads a named edge field from the Exodus file, 
 // returning a newly-allocated array of field data associated with the time 
 // for the given time index.
-real_t* exodus_file_read_scalar_node_field(exodus_file_t* file,
-                                           int time_index,
-                                           const char* field_name);
+real_t* exodus_file_read_edge_field(exodus_file_t* file,
+                                    int time_index,
+                                    const char* field_name);
 
-// Writes a named multicomponent node-centered field, to the given Exodus file. 
-// The field data is interpreted to be in component-minor order and is associated
-// with the time identified by the given time index..
+// Returns true if the given Exodus file contains an edge field 
+// with the given name and associated with the given time index, false otherwise.
+bool exodus_file_contains_edge_field(exodus_file_t* file, 
+                                     int time_index,
+                                     const char* field_name);
+
+// Writes a named node field to the given Exodus file, 
+// associated it the time identified by the given time index.
 void exodus_file_write_node_field(exodus_file_t* file,
                                   int time_index,
-                                  const char** field_component_names,
-                                  real_t* field_data,
-                                  int num_components);
+                                  const char* field_name,
+                                  real_t* field_data);
 
-// Reads a named multicomponent node-centered field from the Exodus file, returning a 
-// newly-allocated array of field data for the given time index.
+// Reads a named node field from the Exodus file, 
+// returning a newly-allocated array of field data associated with the time 
+// for the given time index.
 real_t* exodus_file_read_node_field(exodus_file_t* file,
                                     int time_index,
-                                    const char** field_component_names,
-                                    int num_components);
+                                    const char* field_name);
 
-// Returns true if the given Exodus file contains a (scalar) node-centered field 
+// Returns true if the given Exodus file contains a node field 
 // with the given name and associated with the given time index, false otherwise.
 bool exodus_file_contains_node_field(exodus_file_t* file, 
                                      int time_index,
