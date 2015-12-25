@@ -90,18 +90,17 @@ struct exodus_file_t
   int ex_real_size;     // Word size of data in the present Exodus file.
   int last_time_index;  // Index of most-recently added time written to file.
 
+  // Set to true if we're writing to an Exodus file, false if not.
+  bool writing;
+
   int num_nodes, num_edges, num_faces, num_elem, 
       num_elem_blocks, num_face_blocks, num_edge_blocks;
 
   // Variable names.
-  int num_node_vars, num_node_set_vars,
-      num_edge_vars, num_edge_set_vars,
-      num_face_vars, num_face_set_vars,
-      num_elem_vars, num_elem_set_vars, num_side_set_vars;
-  char **node_var_names, **node_set_var_names,
-       **edge_var_names, **edge_set_var_names,
-       **face_var_names, **face_set_var_names,
-       **elem_var_names, **elem_set_var_names, **side_set_var_names;
+  string_array_t *node_var_names, *node_set_var_names,
+                 *edge_var_names, *edge_set_var_names,
+                 *face_var_names, *face_set_var_names,
+                 *elem_var_names, *elem_set_var_names, *side_set_var_names;
 };
 
 bool exodus_file_query(const char* filename,
@@ -159,46 +158,39 @@ bool exodus_file_query(const char* filename,
   return valid;
 }
 
-static void fetch_variable_names(int ex_id, ex_entity_type obj_type, int* num_vars, char*** var_names)
+static void fetch_variable_names(int ex_id, ex_entity_type obj_type, string_array_t* var_names)
 {
-  ex_get_variable_param(ex_id, obj_type, num_vars);
-  *var_names = polymec_malloc(sizeof(char*) * (*num_vars));
-  for (int i = 0; i < (*num_vars); ++i)
-    (*var_names)[i] = polymec_malloc(sizeof(char) * (MAX_NAME_LENGTH+1));
-  ex_get_variable_names(ex_id, obj_type, *num_vars, *var_names);
+  int num_vars;
+  ex_get_variable_param(ex_id, obj_type, &num_vars);
+  for (int i = 0; i < num_vars; ++i)
+    string_array_append_with_dtor(var_names, (char*)polymec_malloc(sizeof(char) * (MAX_NAME_LENGTH+1)), string_free);
+  ex_get_variable_names(ex_id, obj_type, num_vars, var_names->data);
 }
 
 static void fetch_all_variable_names(exodus_file_t* file)
 {
-  fetch_variable_names(file->ex_id, EX_NODAL, &file->num_node_vars, &file->node_var_names);
-  fetch_variable_names(file->ex_id, EX_NODE_SET, &file->num_node_set_vars, &file->node_set_var_names);
-  fetch_variable_names(file->ex_id, EX_EDGE_BLOCK, &file->num_edge_vars, &file->edge_var_names);
-  fetch_variable_names(file->ex_id, EX_EDGE_SET, &file->num_edge_set_vars, &file->edge_set_var_names);
-  fetch_variable_names(file->ex_id, EX_FACE_BLOCK, &file->num_face_vars, &file->face_var_names);
-  fetch_variable_names(file->ex_id, EX_FACE_SET, &file->num_face_set_vars, &file->face_set_var_names);
-  fetch_variable_names(file->ex_id, EX_ELEM_BLOCK, &file->num_elem_vars, &file->elem_var_names);
-  fetch_variable_names(file->ex_id, EX_ELEM_SET, &file->num_elem_set_vars, &file->elem_set_var_names);
-  fetch_variable_names(file->ex_id, EX_SIDE_SET, &file->num_side_set_vars, &file->side_set_var_names);
-}
-
-static void free_variable_names(int ex_id, int num_vars, char** var_names)
-{
-  for (int i = 0; i < num_vars; ++i)
-    string_free(var_names[i]);
-  polymec_free(var_names);
+  fetch_variable_names(file->ex_id, EX_NODAL, file->node_var_names);
+  fetch_variable_names(file->ex_id, EX_NODE_SET, file->node_set_var_names);
+  fetch_variable_names(file->ex_id, EX_EDGE_BLOCK, file->edge_var_names);
+  fetch_variable_names(file->ex_id, EX_EDGE_SET, file->edge_set_var_names);
+  fetch_variable_names(file->ex_id, EX_FACE_BLOCK, file->face_var_names);
+  fetch_variable_names(file->ex_id, EX_FACE_SET, file->face_set_var_names);
+  fetch_variable_names(file->ex_id, EX_ELEM_BLOCK, file->elem_var_names);
+  fetch_variable_names(file->ex_id, EX_ELEM_SET, file->elem_set_var_names);
+  fetch_variable_names(file->ex_id, EX_SIDE_SET, file->side_set_var_names);
 }
 
 static void free_all_variable_names(exodus_file_t* file)
 {
-  free_variable_names(file->ex_id, file->num_node_vars, file->node_var_names);
-  free_variable_names(file->ex_id, file->num_node_set_vars, file->node_set_var_names);
-  free_variable_names(file->ex_id, file->num_edge_vars, file->edge_var_names);
-  free_variable_names(file->ex_id, file->num_edge_set_vars, file->edge_set_var_names);
-  free_variable_names(file->ex_id, file->num_face_vars, file->face_var_names);
-  free_variable_names(file->ex_id, file->num_face_set_vars, file->face_set_var_names);
-  free_variable_names(file->ex_id, file->num_elem_vars, file->elem_var_names);
-  free_variable_names(file->ex_id, file->num_elem_set_vars, file->elem_set_var_names);
-  free_variable_names(file->ex_id, file->num_side_set_vars, file->side_set_var_names);
+  string_array_free(file->node_var_names);
+  string_array_free(file->node_set_var_names);
+  string_array_free(file->edge_var_names);
+  string_array_free(file->edge_set_var_names);
+  string_array_free(file->face_var_names);
+  string_array_free(file->face_set_var_names);
+  string_array_free(file->elem_var_names);
+  string_array_free(file->elem_set_var_names);
+  string_array_free(file->side_set_var_names);
 }
 
 static exodus_file_t* open_exodus_file(MPI_Comm comm,
@@ -221,8 +213,22 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
 #endif
   if (file->ex_id >= 0)
   {
-    // Read all the available variable names.
-    fetch_all_variable_names(file);
+    file->writing = (mode == EX_WRITE);
+    file->node_var_names = string_array_new();
+    file->node_set_var_names = string_array_new();
+    file->edge_var_names = string_array_new();
+    file->edge_set_var_names = string_array_new();
+    file->face_var_names = string_array_new();
+    file->face_set_var_names = string_array_new();
+    file->elem_var_names = string_array_new();
+    file->elem_set_var_names = string_array_new();
+    file->side_set_var_names = string_array_new();
+
+    if (!file->writing)
+    {
+      // Read all the available variable names.
+      fetch_all_variable_names(file);
+    }
 
     // Get information from the file.
     ex_init_params mesh_info;
@@ -261,6 +267,26 @@ exodus_file_t* exodus_file_open(MPI_Comm comm,
 
 void exodus_file_close(exodus_file_t* file)
 {
+  if (file->writing)
+  {
+    // Write a QA record.
+    char* qa_record[1][4];
+    qa_record[0][0] = string_dup(polymec_executable_name());
+    qa_record[0][1] = string_dup(polymec_executable_name());
+    time_t invocation_time = polymec_invocation_time();
+    struct tm* time_data = localtime(&invocation_time);
+    char date[20], instant[20];
+    snprintf(date, 19, "%2d/%2d/%2d", time_data->tm_mon, time_data->tm_mday, 
+             time_data->tm_year % 100);
+    qa_record[0][1] = string_dup(date);
+    snprintf(instant, 19, "%2d:%2d:%2d", time_data->tm_hour, time_data->tm_min, 
+             time_data->tm_sec % 60);
+    qa_record[0][1] = string_dup(instant);
+    ex_put_qa(file->ex_id, 1, qa_record);
+    for (int i = 0; i < 4; ++i)
+      string_free(qa_record[0][i]);
+  }
+
   // Clean up.
   free_all_variable_names(file);
 #if POLYMEC_HAVE_MPI
@@ -273,6 +299,48 @@ void exodus_file_close(exodus_file_t* file)
 void exodus_file_write_fe_mesh(exodus_file_t* file,
                                fe_mesh_t* mesh)
 {
+  ASSERT(file->writing);
+
+  // Go over the element blocks and write out the data.
+  int pos = 0;
+  char* block_name;
+  fe_block_t* block;
+  while (fe_mesh_next_block(mesh, &pos, &block_name, &block))
+  {
+    int elem_block = pos;
+    int num_elem = fe_block_num_elements(block);
+    fe_mesh_element_t elem_type = fe_block_element_type(block);
+    if (elem_type == FE_POLYHEDRON)
+    {
+//      ex_put_block(file->ex_id, EX_ELEM_BLOCK, elem_block, 
+//                   "nfaced", num_elem, NULL, 
+//                   &num_nodes_per_elem, NULL,
+//                   &num_faces_per_elem, NULL);
+    }
+    else if (elem_type != FE_INVALID)
+    {
+//      char elem_type_name[MAX_NAME_LENGTH+1];
+//      int num_elem, num_nodes_per_elem, num_faces_per_elem;
+//      ex_put_block(file->ex_id, EX_ELEM_BLOCK, elem_block, 
+//                   elem_type_name, &num_elem,
+//                   &num_nodes_per_elem, NULL,
+//                   &num_faces_per_elem, NULL);
+    }
+
+    // Set the element block name.
+    ex_put_name(file->ex_id, EX_ELEM_BLOCK, elem_block, block_name);
+  }
+
+  // Set node positions.
+  real_t x[file->num_nodes], y[file->num_nodes], z[file->num_nodes];
+  point_t* X = fe_mesh_node_coordinates(mesh);
+  for (int n = 0; n < file->num_nodes; ++n)
+  {
+    x[n] = X[n].x;
+    y[n] = X[n].y;
+    z[n] = X[n].z;
+  }
+  ex_put_coord(file->ex_id, x, y, z);
 }
 
 fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
@@ -313,7 +381,7 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
       // Find the number of faces for each element in the block.
       int* num_elem_faces = polymec_malloc(sizeof(int) * num_elem);
       ex_get_entity_count_per_polyhedra(file->ex_id, EX_ELEM_BLOCK, elem_block, 
-                                          num_elem_faces);
+                                        num_elem_faces);
 
       // Get the element->face connectivity.
       int elem_face_size = 0;
@@ -378,6 +446,7 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
 
 int exodus_file_write_time(exodus_file_t* file, real_t time)
 {
+  ASSERT(file->writing);
   int next_index = file->last_time_index + 1;
   int status = ex_put_time(file->ex_id, next_index, &time);
   if (status >= 0)
@@ -411,6 +480,30 @@ void exodus_file_write_element_field(exodus_file_t* file,
                                      const char* field_name,
                                      real_t* field_data)
 {
+  ASSERT(file->writing);
+
+  // Find the variable index if it already exists.
+  int index = 0;
+  while (index < file->elem_var_names->size)
+  {
+    if (strcmp(field_name, file->elem_var_names->data[index]) == 0)
+      break;
+    ++index;
+  }
+
+  // Append the variable to our list if we didn't find it.
+  if (index >= file->elem_var_names->size)
+    string_array_append_with_dtor(file->elem_var_names, string_dup(field_name), string_free);
+
+  // Insert the data.
+  int offset = 0;
+  for (int i = 1; i <= file->num_elem_blocks; ++i)
+  {
+    int N;
+    ex_get_block(file->ex_id, EX_ELEM_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+    ex_put_var(file->ex_id, time_index, EX_ELEM_BLOCK, index+1, i, N, &field_data[offset]);
+    offset += N;
+  }
 }
 
 real_t* exodus_file_read_element_field(exodus_file_t* file,
@@ -419,15 +512,15 @@ real_t* exodus_file_read_element_field(exodus_file_t* file,
 {
   // Find the variable index.
   int index = 0;
-  while (index < file->num_elem_vars)
+  while (index < file->elem_var_names->size)
   {
-    if (strcmp(field_name, file->elem_var_names[index]) == 0)
+    if (strcmp(field_name, file->elem_var_names->data[index]) == 0)
       break;
     ++index;
   }
 
   // Fetch the field data.
-  if (index < file->num_elem_vars)
+  if (index < file->elem_var_names->size)
   {
     int offset = 0;
     real_t* field = polymec_malloc(sizeof(real_t) * file->num_elem);
@@ -450,9 +543,9 @@ bool exodus_file_contains_element_field(exodus_file_t* file,
                                         const char* field_name)
 {
   int index = 0;
-  while (index < file->num_elem_vars)
+  while (index < file->elem_var_names->size)
   {
-    if (strcmp(field_name, file->elem_var_names[index]) == 0)
+    if (strcmp(field_name, file->elem_var_names->data[index]) == 0)
       return true;
   }
   return false;
@@ -463,6 +556,30 @@ void exodus_file_write_face_field(exodus_file_t* file,
                                   const char* field_name,
                                   real_t* field_data)
 {
+  ASSERT(file->writing);
+
+  // Find the variable index if it already exists.
+  int index = 0;
+  while (index < file->face_var_names->size)
+  {
+    if (strcmp(field_name, file->face_var_names->data[index]) == 0)
+      break;
+    ++index;
+  }
+
+  // Append the variable to our list if we didn't find it.
+  if (index >= file->face_var_names->size)
+    string_array_append_with_dtor(file->face_var_names, string_dup(field_name), string_free);
+
+  // Insert the data.
+  int offset = 0;
+  for (int i = 1; i <= file->num_face_blocks; ++i)
+  {
+    int N;
+    ex_get_block(file->ex_id, EX_FACE_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+    ex_put_var(file->ex_id, time_index, EX_FACE_BLOCK, index+1, i, N, &field_data[offset]);
+    offset += N;
+  }
 }
 
 real_t* exodus_file_read_face_field(exodus_file_t* file,
@@ -471,15 +588,15 @@ real_t* exodus_file_read_face_field(exodus_file_t* file,
 {
   // Find the variable index.
   int index = 0;
-  while (index < file->num_face_vars)
+  while (index < file->face_var_names->size)
   {
-    if (strcmp(field_name, file->face_var_names[index]) == 0)
+    if (strcmp(field_name, file->face_var_names->data[index]) == 0)
       break;
     ++index;
   }
 
   // Fetch the field data.
-  if (index < file->num_face_vars)
+  if (index < file->face_var_names->size)
   {
     int offset = 0;
     real_t* field = polymec_malloc(sizeof(real_t) * file->num_faces);
@@ -502,9 +619,9 @@ bool exodus_file_contains_face_field(exodus_file_t* file,
                                      const char* field_name)
 {
   int index = 0;
-  while (index < file->num_face_vars)
+  while (index < file->face_var_names->size)
   {
-    if (strcmp(field_name, file->face_var_names[index]) == 0)
+    if (strcmp(field_name, file->face_var_names->data[index]) == 0)
       return true;
   }
   return false;
@@ -515,6 +632,30 @@ void exodus_file_write_edge_field(exodus_file_t* file,
                                   const char* field_name,
                                   real_t* field_data)
 {
+  ASSERT(file->writing);
+
+  // Find the variable index if it already exists.
+  int index = 0;
+  while (index < file->edge_var_names->size)
+  {
+    if (strcmp(field_name, file->edge_var_names->data[index]) == 0)
+      break;
+    ++index;
+  }
+
+  // Append the variable to our list if we didn't find it.
+  if (index >= file->edge_var_names->size)
+    string_array_append_with_dtor(file->edge_var_names, string_dup(field_name), string_free);
+
+  // Insert the data.
+  int offset = 0;
+  for (int i = 1; i <= file->num_edge_blocks; ++i)
+  {
+    int N;
+    ex_get_block(file->ex_id, EX_EDGE_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+    ex_put_var(file->ex_id, time_index, EX_EDGE_BLOCK, index+1, i, N, &field_data[offset]);
+    offset += N;
+  }
 }
 
 real_t* exodus_file_read_edge_field(exodus_file_t* file,
@@ -523,15 +664,15 @@ real_t* exodus_file_read_edge_field(exodus_file_t* file,
 {
   // Find the variable index.
   int index = 0;
-  while (index < file->num_edge_vars)
+  while (index < file->edge_var_names->size)
   {
-    if (strcmp(field_name, file->edge_var_names[index]) == 0)
+    if (strcmp(field_name, file->edge_var_names->data[index]) == 0)
       break;
     ++index;
   }
 
   // Fetch the field data.
-  if (index < file->num_edge_vars)
+  if (index < file->edge_var_names->size)
   {
     int offset = 0;
     real_t* field = polymec_malloc(sizeof(real_t) * file->num_edges);
@@ -554,9 +695,9 @@ bool exodus_file_contains_edge_field(exodus_file_t* file,
                                      const char* field_name)
 {
   int index = 0;
-  while (index < file->num_edge_vars)
+  while (index < file->edge_var_names->size)
   {
-    if (strcmp(field_name, file->edge_var_names[index]) == 0)
+    if (strcmp(field_name, file->edge_var_names->data[index]) == 0)
       return true;
   }
   return false;
@@ -567,6 +708,23 @@ void exodus_file_write_node_field(exodus_file_t* file,
                                   const char* field_name,
                                   real_t* field_data)
 {
+  ASSERT(file->writing);
+
+  // Find the variable index if it already exists.
+  int index = 0;
+  while (index < file->node_var_names->size)
+  {
+    if (strcmp(field_name, file->node_var_names->data[index]) == 0)
+      break;
+    ++index;
+  }
+
+  // Append the variable to our list if we didn't find it.
+  if (index >= file->node_var_names->size)
+    string_array_append_with_dtor(file->node_var_names, string_dup(field_name), string_free);
+
+  // Insert the data.
+  ex_put_var(file->ex_id, time_index, EX_NODE_BLOCK, index+1, 1, file->num_nodes, field_data);
 }
 
 real_t* exodus_file_read_node_field(exodus_file_t* file,
@@ -575,15 +733,15 @@ real_t* exodus_file_read_node_field(exodus_file_t* file,
 {
   // Find the variable index.
   int index = 0;
-  while (index < file->num_node_vars)
+  while (index < file->node_var_names->size)
   {
-    if (strcmp(field_name, file->node_var_names[index]) == 0)
+    if (strcmp(field_name, file->node_var_names->data[index]) == 0)
       break;
     ++index;
   }
 
   // Fetch the field data.
-  if (index < file->num_node_vars)
+  if (index < file->node_var_names->size)
   {
     real_t* field = polymec_malloc(sizeof(real_t) * file->num_nodes);
     memset(field, 0, sizeof(real_t) * file->num_nodes);
@@ -599,9 +757,9 @@ bool exodus_file_contains_node_field(exodus_file_t* file,
                                      const char* field_name)
 {
   int index = 0;
-  while (index < file->num_node_vars)
+  while (index < file->node_var_names->size)
   {
-    if (strcmp(field_name, file->node_var_names[index]) == 0)
+    if (strcmp(field_name, file->node_var_names->data[index]) == 0)
       return true;
   }
   return false;
