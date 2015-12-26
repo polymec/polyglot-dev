@@ -38,6 +38,13 @@ exodus_file_t* exodus_file_open(MPI_Comm comm, const char* filename);
 // Closes and destroys the given Exodus file.
 void exodus_file_close(exodus_file_t* file);
 
+// Returns an internal string containing the title of the Exodus database
+// in the file.
+char* exodus_file_title(exodus_file_t* file);
+
+// Sets the title of the Exodus database within the file.
+void exodus_file_set_title(exodus_file_t* file, const char* title);
+
 // Writes a finite element mesh to the given Exodus file, overwriting 
 // any existing mesh there. All cells (or "elements") are written to a single 
 // element block within the Exodus mesh.

@@ -122,7 +122,7 @@ static void get_elem_info(fe_mesh_element_t elem_type,
 
 struct exodus_file_t 
 {
-  char filename[FILENAME_MAX+1];
+  char title[MAX_NAME_LENGTH+1];
 
 #if POLYMEC_HAVE_MPI
   MPI_Comm comm;        // Parallel communicator.
@@ -245,7 +245,6 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
   exodus_file_t* file = polymec_malloc(sizeof(exodus_file_t));
   file->last_time_index = 0;
   file->comm = comm;
-  strncpy(file->filename, filename, FILENAME_MAX);
   int real_size = (int)sizeof(real_t);
   file->ex_real_size = 0;
 #if POLYMEC_HAVE_MPI
@@ -280,6 +279,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
       int status = ex_get_init_ext(file->ex_id, &mesh_info);
       if ((status >= 0) && (mesh_info.num_dim == 3))
       {
+        strncpy(file->title, mesh_info.title, MAX_NAME_LENGTH);
         file->num_nodes = mesh_info.num_nodes;
         file->num_elem = mesh_info.num_elem;
         file->num_faces = mesh_info.num_face;
@@ -292,6 +292,11 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
         file->num_edge_sets = mesh_info.num_edge_sets;
         file->num_side_sets = mesh_info.num_side_sets;
       }
+    }
+    else
+    {
+      // By default, the title of the database is its filename.
+      strncpy(file->title, filename, MAX_NAME_LENGTH);
     }
   }
   else
@@ -346,6 +351,16 @@ void exodus_file_close(exodus_file_t* file)
   ex_close(file->ex_id);
 }
 
+char* exodus_file_title(exodus_file_t* file)
+{
+  return file->title;
+}
+
+void exodus_file_set_title(exodus_file_t* file, const char* title)
+{
+  strncpy(file->title, title, MAX_NAME_LENGTH);
+}
+
 static void write_set(exodus_file_t* file, 
                       ex_entity_type set_type,
                       int set_id,
@@ -391,7 +406,7 @@ void exodus_file_write_fe_mesh(exodus_file_t* file,
   // Write out information about elements, faces, edges, nodes.
   file->num_nodes = fe_mesh_num_nodes(mesh);
   ex_init_params params;
-  strcpy(params.title, file->filename);
+  strcpy(params.title, file->title);
   params.num_dim = 3;
   params.num_nodes = file->num_nodes;
   int num_edges = fe_mesh_num_edges(mesh);
