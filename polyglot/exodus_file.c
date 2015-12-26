@@ -155,6 +155,7 @@ bool exodus_file_query(const char* filename,
                        real_array_t* times)
 {
   bool valid = true;
+  bool is_parallel = false;
   int my_real_size = (int)sizeof(real_t);
   int io_real_size = 0;
 #if POLYMEC_HAVE_MPI
@@ -163,10 +164,21 @@ bool exodus_file_query(const char* filename,
   int id = ex_open_par(filename, EX_READ, &my_real_size,
                        &io_real_size, version, 
                        MPI_COMM_WORLD, info);
+
+  // Did that work? If not, try the serial opener.
+  if (id < 0)
+  {
+    MPI_Info_free(&info);
+    id = ex_open(filename, EX_READ, &my_real_size,
+                 &io_real_size, version);
+  }
+  else
+    is_parallel = true;
 #else
   int id = ex_open(filename, EX_READ, &my_real_size,
-                   &io_real_size, &version);
+                   &io_real_size, version);
 #endif
+
   if (id < 0)
     valid = false;
   else
@@ -184,7 +196,10 @@ bool exodus_file_query(const char* filename,
       int num_proc_in_file;
       char file_type[2];
       ex_get_init_info(id, num_mpi_processes, &num_proc_in_file, file_type);
-      ASSERT(*num_mpi_processes == num_proc_in_file);
+      if (is_parallel)
+      {
+        ASSERT(*num_mpi_processes == num_proc_in_file);
+      }
 
       if (times != NULL)
       {
@@ -199,7 +214,8 @@ bool exodus_file_query(const char* filename,
   }
 
 #if POLYMEC_HAVE_MPI
-  MPI_Info_free(&info);
+  if (is_parallel)
+    MPI_Info_free(&info);
 #endif
 
   return valid;
@@ -254,6 +270,13 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
   file->ex_id = ex_open_par(filename, mode, &real_size,
                             &file->ex_real_size, &file->ex_version, 
                             file->comm, file->mpi_info);
+
+  // Did that work? If not, try the serial opener.
+  if (file->ex_id < 0)
+  {
+    file->ex_id = ex_open(filename, mode, &real_size,
+                          &file->ex_real_size, &file->ex_version);
+  }
 #else
   file->ex_id = ex_open(filename, mode, &real_size,
                         &file->ex_real_size, &file->ex_version);

@@ -18,12 +18,12 @@ void test_exodus_file_query(void** state)
   float version;
   int num_mpi_processes;
   real_array_t* times = real_array_new();
-  bool result = exodus_file_query("testwt-nfaced.exo", &real_size, &version,
+  bool result = exodus_file_query("test-nfaced.exo", &real_size, &version,
                                   &num_mpi_processes, times);
-printf("%zd, %f, %d, %zu\n", real_size, version, num_mpi_processes, times->size);
   assert_true(result);
-  assert_true(real_size == sizeof(double));
+  assert_true(real_size == sizeof(float));
   assert_true(version >= 6.09);
+  assert_true(times->size == 0);
   real_array_free(times);
 }
 
