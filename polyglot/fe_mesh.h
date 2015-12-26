@@ -214,9 +214,70 @@ int fe_mesh_num_nodes(fe_mesh_t* mesh);
 int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
                            int edge_index);
 
+// Establishes face->node connectivity.
+void fe_mesh_set_face_nodes(fe_mesh_t* mesh, 
+                            int* num_face_nodes, 
+                            int* face_nodes);
+
 // Returns an internal pointer to the set of points defining the positions 
 // of the nodes within the mesh.
 point_t* fe_mesh_node_coordinates(fe_mesh_t* mesh);
+
+// Returns the number of element sets in the mesh.
+int fe_mesh_num_element_sets(fe_mesh_t* mesh); 
+
+// Creates a new element set with the given name and size, returning a pointer 
+// to its storage.
+int* fe_mesh_create_element_set(fe_mesh_t* mesh, const char* name, int size);
+
+// Traverses the element sets in the mesh, providing access to the name, 
+// contents, and size of each one, and returning false when the traversal ends.
+bool fe_mesh_next_element_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size);
+
+// Returns the number of face sets in the mesh.
+int fe_mesh_num_face_sets(fe_mesh_t* mesh);
+
+// Creates a new face set with the given name and size, returning a pointer 
+// to its storage.
+int* fe_mesh_create_face_set(fe_mesh_t* mesh, const char* name, int size);
+
+// Traverses the face sets in the mesh, providing access to the name, 
+// contents, and size of each one, and returning false when the traversal ends.
+bool fe_mesh_next_face_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size);
+
+// Returns the number of edge sets in the mesh.
+int fe_mesh_num_edge_sets(fe_mesh_t* mesh);
+
+// Creates a new edge set with the given name and size, returning a pointer 
+// to its storage.
+int* fe_mesh_create_edge_set(fe_mesh_t* mesh, const char* name, int size);
+
+// Traverses the edge sets in the mesh, providing access to the name, 
+// contents, and size of each one, and returning false when the traversal ends.
+bool fe_mesh_next_edge_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size);
+
+// Returns the number of node sets in the mesh.
+int fe_mesh_num_node_sets(fe_mesh_t* mesh);
+
+// Creates a new node set with the given name and size, returning a pointer 
+// to its storage.
+int* fe_mesh_create_node_set(fe_mesh_t* mesh, const char* name, int size);
+
+// Traverses the node sets in the mesh, providing access to the name, 
+// contents, and size of each one, and returning false when the traversal ends.
+bool fe_mesh_next_node_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size);
+
+// Returns the number of side sets in the mesh.
+int fe_mesh_num_side_sets(fe_mesh_t* mesh);
+
+// Creates a new side set with the given name and size, returning a pointer 
+// to its storage. Each "element" of the side set is 2 integers: one identifying 
+// an element and one identifying a face.
+int* fe_mesh_create_side_set(fe_mesh_t* mesh, const char* name, int size);
+
+// Traverses the side sets in the mesh, providing access to the name, 
+// contents, and size of each one, and returning false when the traversal ends.
+bool fe_mesh_next_side_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size);
 
 // Returns a serializer object that can read/write finite element meshes 
 // from/to byte arrays.
