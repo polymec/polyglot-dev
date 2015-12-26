@@ -149,28 +149,30 @@ struct exodus_file_t
 };
 
 bool exodus_file_query(const char* filename,
-                       int* real_size,
+                       size_t* real_size,
                        float* version,
                        int* num_mpi_processes,
                        real_array_t* times)
 {
   bool valid = true;
   int my_real_size = (int)sizeof(real_t);
-  *real_size = 0;
+  int io_real_size = 0;
 #if POLYMEC_HAVE_MPI
   MPI_Info info;
   MPI_Info_create(&info);
   int id = ex_open_par(filename, EX_READ, &my_real_size,
-                       real_size, version, 
+                       &io_real_size, version, 
                        MPI_COMM_WORLD, info);
 #else
   int id = ex_open(filename, EX_READ, &my_real_size,
-                   &real_size, &version);
+                   &io_real_size, &version);
 #endif
   if (id < 0)
     valid = false;
   else
   {
+    *real_size = (size_t)io_real_size;
+
     // Make sure that the file has 3D data.
     ex_init_params mesh_info;
     int status = ex_get_init_ext(id, &mesh_info);
@@ -591,7 +593,7 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
       face_node_size += num_face_nodes[i];
     int* face_nodes = polymec_malloc(sizeof(int) * face_node_size);
     ex_get_conn(file->ex_id, EX_FACE_BLOCK, 1, face_nodes, NULL, NULL);
-    fe_mesh_set_face_nodes(mesh, num_face_nodes, face_nodes);
+    fe_mesh_set_face_nodes(mesh, num_faces, num_face_nodes, face_nodes);
 
     // Clean up.
     polymec_free(num_face_nodes);

@@ -214,8 +214,13 @@ int fe_mesh_num_nodes(fe_mesh_t* mesh);
 int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
                            int edge_index);
 
-// Establishes face->node connectivity.
+// Establishes face->node connectivity. num_face_nodes[i] contains the 
+// number of nodes for the ith face in the mesh, and face_nodes contains the 
+// indices of the nodes of each face in face-major order, from the first node 
+// of the first face to the last node of the last face. face_nodes is 
+// consumed by this operation; num_face_nodes is not.
 void fe_mesh_set_face_nodes(fe_mesh_t* mesh, 
+                            int num_faces,
                             int* num_face_nodes, 
                             int* face_nodes);
 

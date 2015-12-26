@@ -22,7 +22,7 @@ typedef struct exodus_file_t exodus_file_t;
 // it has data, and (if times is non-NULL) an array of times for which the file contains data.
 // Returns true if the given file is a valid Exodus file, false if it is not.
 bool exodus_file_query(const char* filename,
-                       int* real_size,
+                       size_t* real_size,
                        float* version,
                        int* num_mpi_processes,
                        real_array_t* times);

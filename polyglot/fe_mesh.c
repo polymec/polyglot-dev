@@ -6,6 +6,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include "core/array.h"
+#include "core/tagger.h"
 #include "polyglot/fe_mesh.h"
 
 struct fe_block_t 
@@ -200,6 +201,13 @@ struct fe_mesh_t
   int num_edges;
   int* edge_node_offsets;
   int* edge_nodes;
+
+  // Entity sets.
+  tagger_t* elem_sets;
+  tagger_t* face_sets;
+  tagger_t* edge_sets;
+  tagger_t* node_sets;
+  tagger_t* side_sets;
 };
 
 fe_mesh_t* fe_mesh_new(MPI_Comm comm, int num_nodes)
@@ -213,11 +221,30 @@ fe_mesh_t* fe_mesh_new(MPI_Comm comm, int num_nodes)
   mesh->block_elem_offsets = int_array_new();
   int_array_append(mesh->block_elem_offsets, 0);
   mesh->node_coords = polymec_malloc(sizeof(point_t) * mesh->num_nodes);
+
+  mesh->elem_sets = tagger_new();
+  mesh->face_sets = tagger_new();
+  mesh->edge_sets = tagger_new();
+  mesh->node_sets = tagger_new();
+  mesh->side_sets = tagger_new();
+
   return mesh;
 }
 
 void fe_mesh_free(fe_mesh_t* mesh)
 {
+  tagger_free(mesh->elem_sets);
+  tagger_free(mesh->face_sets);
+  tagger_free(mesh->edge_sets);
+  tagger_free(mesh->node_sets);
+  tagger_free(mesh->side_sets);
+
+  if (mesh->face_nodes != NULL)
+  {
+    polymec_free(mesh->face_nodes);
+    polymec_free(mesh->face_node_offsets);
+  }
+
   ptr_array_free(mesh->blocks);
   string_array_free(mesh->block_names);
   int_array_free(mesh->block_elem_offsets);
@@ -414,6 +441,20 @@ int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
   return mesh->edge_node_offsets[edge_index+1] - offset;
 }
 
+void fe_mesh_set_face_nodes(fe_mesh_t* mesh, 
+                            int num_faces,
+                            int* num_face_nodes, 
+                            int* face_nodes)
+{
+  ASSERT(num_faces > 0);
+  mesh->num_faces = num_faces;
+  mesh->face_node_offsets = polymec_malloc(sizeof(int) * (mesh->num_faces+1));
+  mesh->face_node_offsets[0] = 0;
+  for (int i = 0; i < num_faces; ++i)
+    mesh->face_node_offsets[i+1] = mesh->face_node_offsets[i] + num_face_nodes[i];
+  mesh->face_nodes = face_nodes;
+}
+
 void fe_mesh_get_edge_nodes(fe_mesh_t* mesh, 
                             int edge_index, 
                             int* edge_nodes)
@@ -431,6 +472,106 @@ int fe_mesh_num_nodes(fe_mesh_t* mesh)
 point_t* fe_mesh_node_coordinates(fe_mesh_t* mesh)
 {
   return mesh->node_coords;
+}
+
+int fe_mesh_num_element_sets(fe_mesh_t* mesh)
+{
+  // Count up the tags in the appropriate tagger.
+  int pos = 0, *tag, size, num_tags = 0;
+  char* tag_name;
+  while (tagger_next_tag(mesh->elem_sets, &pos, &tag_name, &tag, &size))
+    ++num_tags;
+  return num_tags;
+}
+
+int* fe_mesh_create_element_set(fe_mesh_t* mesh, const char* name, int size)
+{
+  return tagger_create_tag(mesh->elem_sets, name, size);
+}
+
+bool fe_mesh_next_element_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+{
+  return tagger_next_tag(mesh->elem_sets, pos, name, set, size);
+}
+
+int fe_mesh_num_face_sets(fe_mesh_t* mesh)
+{
+  // Count up the tags in the appropriate tagger.
+  int pos = 0, *tag, size, num_tags = 0;
+  char* tag_name;
+  while (tagger_next_tag(mesh->face_sets, &pos, &tag_name, &tag, &size))
+    ++num_tags;
+  return num_tags;
+}
+
+int* fe_mesh_create_face_set(fe_mesh_t* mesh, const char* name, int size)
+{
+  return tagger_create_tag(mesh->face_sets, name, size);
+}
+
+bool fe_mesh_next_face_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+{
+  return tagger_next_tag(mesh->face_sets, pos, name, set, size);
+}
+
+int fe_mesh_num_edge_sets(fe_mesh_t* mesh)
+{
+  // Count up the tags in the appropriate tagger.
+  int pos = 0, *tag, size, num_tags = 0;
+  char* tag_name;
+  while (tagger_next_tag(mesh->edge_sets, &pos, &tag_name, &tag, &size))
+    ++num_tags;
+  return num_tags;
+}
+
+int* fe_mesh_create_edge_set(fe_mesh_t* mesh, const char* name, int size)
+{
+  return tagger_create_tag(mesh->edge_sets, name, size);
+}
+
+bool fe_mesh_next_edge_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+{
+  return tagger_next_tag(mesh->edge_sets, pos, name, set, size);
+}
+
+int fe_mesh_num_node_sets(fe_mesh_t* mesh)
+{
+  // Count up the tags in the appropriate tagger.
+  int pos = 0, *tag, size, num_tags = 0;
+  char* tag_name;
+  while (tagger_next_tag(mesh->node_sets, &pos, &tag_name, &tag, &size))
+    ++num_tags;
+  return num_tags;
+}
+
+int* fe_mesh_create_node_set(fe_mesh_t* mesh, const char* name, int size)
+{
+  return tagger_create_tag(mesh->node_sets, name, size);
+}
+
+bool fe_mesh_next_node_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+{
+  return tagger_next_tag(mesh->node_sets, pos, name, set, size);
+}
+
+int fe_mesh_num_side_sets(fe_mesh_t* mesh)
+{
+  // Count up the tags in the appropriate tagger.
+  int pos = 0, *tag, size, num_tags = 0;
+  char* tag_name;
+  while (tagger_next_tag(mesh->side_sets, &pos, &tag_name, &tag, &size))
+    ++num_tags;
+  return num_tags;
+}
+
+int* fe_mesh_create_side_set(fe_mesh_t* mesh, const char* name, int size)
+{
+  return tagger_create_tag(mesh->side_sets, name, 2*size);
+}
+
+bool fe_mesh_next_side_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+{
+  return tagger_next_tag(mesh->side_sets, pos, name, set, size);
 }
 
 serializer_t* fe_mesh_serializer()
