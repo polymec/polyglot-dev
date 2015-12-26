@@ -2,8 +2,8 @@
 add_library(polyglot polyglot.c fe_mesh.c exodus_file.c cf_file.c 
             import_tetgen_mesh.c tough2_file.c)
 
-set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_TP_LIBRARIES};${POLYMEC_LIBRARIES} PARENT_SCOPE)
-set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_TP_LIBRARIES};${POLYMEC_LIBRARIES})
+set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_LIBRARIES};${POLYMEC_LIBRARIES} PARENT_SCOPE)
+set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_LIBRARIES};${POLYMEC_LIBRARIES})
 
 add_subdirectory(tests)
 
