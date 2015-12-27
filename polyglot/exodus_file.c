@@ -363,9 +363,12 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
       file->num_edges = 0;
       file->num_faces = 0;
       file->num_elem = 0;
-      file->elem_block_ids = 0;
-      file->face_block_ids = 0;
-      file->edge_block_ids = 0;
+      file->num_elem_blocks = 0;
+      file->elem_block_ids = NULL;
+      file->num_face_blocks = 0;
+      file->face_block_ids = NULL;
+      file->num_edge_blocks = 0;
+      file->edge_block_ids = NULL;
       file->num_elem_sets = 0;
       file->num_face_sets = 0;
       file->num_edge_sets = 0;
@@ -547,7 +550,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
 
     // Number of nodes per face.
     ex_put_entity_count_per_polyhedra(file->ex_id, EX_FACE_BLOCK, 
-                                      file->face_block_ids[0], num_face_nodes); 
+                                      1, num_face_nodes); 
   }
 
   // Go over the element blocks and write out the data.
@@ -619,6 +622,8 @@ void exodus_file_write_mesh(exodus_file_t* file,
     z[n] = X[n].z;
   }
   ex_put_coord(file->ex_id, x, y, z);
+  char* coord_names[3] = {"x", "y", "z"};
+  ex_put_coord_names(file->ex_id, coord_names);
 
   // Write sets of entities.
   int *set, set_size;
@@ -745,7 +750,7 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
         elem_faces[i] -= 1;
 
       // Create the element block.
-      block = fe_polyhedral_block_new(num_elem, num_elem_faces, elem_faces);
+      block = polyhedral_fe_block_new(num_elem, num_elem_faces, elem_faces);
     }
     else if (elem_type != FE_INVALID)
     {

@@ -61,7 +61,8 @@ fe_block_t* fe_block_new(int num_elem,
   block->elem_node_offsets[0] = 0;
   for (int i = 0; i < num_elem; ++i)
     block->elem_node_offsets[i+1] = block->elem_node_offsets[i] + num_elem_nodes;
-  block->elem_nodes = elem_node_indices;
+  block->elem_nodes = polymec_malloc(sizeof(int) * block->elem_node_offsets[num_elem]);
+  memcpy(block->elem_nodes, elem_node_indices, sizeof(int) * block->elem_node_offsets[num_elem]);
 
   // Elements don't understand their faces.
   block->elem_face_offsets = NULL;
@@ -73,7 +74,7 @@ fe_block_t* fe_block_new(int num_elem,
   return block;
 }
 
-fe_block_t* fe_polyhedral_block_new(int num_elem,
+fe_block_t* polyhedral_fe_block_new(int num_elem,
                                     int* num_elem_faces,
                                     int* elem_face_indices)
 {
@@ -92,8 +93,8 @@ fe_block_t* fe_polyhedral_block_new(int num_elem,
   block->elem_face_offsets[0] = 0;
   for (int i = 0; i < num_elem; ++i)
     block->elem_face_offsets[i+1] = block->elem_face_offsets[i] + num_elem_faces[i];
-  polymec_free(num_elem_faces);
-  block->elem_faces = elem_face_indices;
+  block->elem_faces = polymec_malloc(sizeof(int) * block->elem_face_offsets[num_elem]);
+  memcpy(block->elem_faces, elem_face_indices, sizeof(int) * block->elem_face_offsets[num_elem]);
 
   // Element nodes are not determined until the block is added to the mesh.
   block->elem_node_offsets = NULL;
@@ -222,6 +223,7 @@ fe_mesh_t* fe_mesh_new(MPI_Comm comm, int num_nodes)
   mesh->block_elem_offsets = int_array_new();
   int_array_append(mesh->block_elem_offsets, 0);
   mesh->node_coords = polymec_malloc(sizeof(point_t) * mesh->num_nodes);
+  memset(mesh->node_coords, 0, sizeof(point_t) * mesh->num_nodes);
 
   mesh->num_faces = 0;
   mesh->face_node_offsets = NULL;
@@ -493,7 +495,8 @@ void fe_mesh_set_face_nodes(fe_mesh_t* mesh,
   mesh->face_node_offsets[0] = 0;
   for (int i = 0; i < num_faces; ++i)
     mesh->face_node_offsets[i+1] = mesh->face_node_offsets[i] + num_face_nodes[i];
-  mesh->face_nodes = face_nodes;
+  mesh->face_nodes = polymec_malloc(sizeof(int) * mesh->face_node_offsets[num_faces]);
+  memcpy(mesh->face_nodes, face_nodes, sizeof(int) * mesh->face_node_offsets[num_faces]);
 }
 
 void fe_mesh_get_edge_nodes(fe_mesh_t* mesh, 

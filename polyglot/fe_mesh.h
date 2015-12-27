@@ -42,8 +42,7 @@ typedef struct fe_block_t fe_block_t;
 // Constructs a new finite element block of the given non-polyhedral type 
 // by specifying the nodes that make up each element. elem_node_indices 
 // is an array that lists the node indices for each element, in order. The 
-// number of nodes per element is defined by the element type. The elem_node_indices
-// array is consumed by this function.
+// number of nodes per element is defined by the element type.
 fe_block_t* fe_block_new(int num_elem,
                          fe_mesh_element_t type,
                          int* elem_node_indices);
@@ -54,8 +53,8 @@ fe_block_t* fe_block_new(int num_elem,
 // number of faces attached to each element in the block; face_types is an 
 // array of types for the faces of each element; face_node_indices is an 
 // array that lists the node indices for each face, in order, defined by the 
-// face type. All arrays are consumed by this function.
-fe_block_t* fe_polyhedral_block_new(int num_elem,
+// face type. 
+fe_block_t* polyhedral_fe_block_new(int num_elem,
                                     int* num_elem_faces,
                                     int* elem_face_indices);
 
@@ -217,8 +216,7 @@ int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
 // Establishes face->node connectivity. num_face_nodes[i] contains the 
 // number of nodes for the ith face in the mesh, and face_nodes contains the 
 // indices of the nodes of each face in face-major order, from the first node 
-// of the first face to the last node of the last face. face_nodes is 
-// consumed by this operation; num_face_nodes is not.
+// of the first face to the last node of the last face.
 void fe_mesh_set_face_nodes(fe_mesh_t* mesh, 
                             int num_faces,
                             int* num_face_nodes, 
