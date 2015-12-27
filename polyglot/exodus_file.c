@@ -270,23 +270,50 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
   file->ex_real_size = 0;
 #if POLYMEC_HAVE_MPI
   MPI_Info_create(&file->mpi_info);
-  file->ex_id = ex_open_par(filename, mode, &real_size,
-                            &file->ex_real_size, &file->ex_version, 
-                            file->comm, file->mpi_info);
+  if (mode & EX_READ)
+  {
+    file->ex_id = ex_open_par(filename, mode, &real_size,
+                              &file->ex_real_size, &file->ex_version, 
+                              file->comm, file->mpi_info);
 
-  // Did that work? If not, try the serial opener.
-  if (file->ex_id < 0)
+    // Did that work? If not, try the serial opener.
+    if (file->ex_id < 0)
+    {
+      file->ex_id = ex_open(filename, mode, &real_size,
+                            &file->ex_real_size, &file->ex_version);
+    }
+  }
+  else
+  {
+    ASSERT(mode & EX_CLOBBER);
+    file->ex_version = EX_API_VERS;
+    file->ex_id = ex_create_par(filename, mode, &real_size,
+                                &file->ex_real_size, 
+                                file->comm, file->mpi_info);
+
+    // Did that work? If not, try the serial creator.
+    if (file->ex_id < 0)
+    {
+      file->ex_id = ex_create(filename, mode, &real_size,
+                              &file->ex_real_size);
+    }
+  }
+#else
+  if (mode | EX_READ)
   {
     file->ex_id = ex_open(filename, mode, &real_size,
                           &file->ex_real_size, &file->ex_version);
   }
-#else
-  file->ex_id = ex_open(filename, mode, &real_size,
-                        &file->ex_real_size, &file->ex_version);
+  else
+  {
+    ASSERT(mode & EX_CLOBBER);
+    file->ex_id = ex_create(filename, mode, &real_size, &file->ex_real_size);
+    file->ex_version = EX_API_VERS;
+  }
 #endif
   if (file->ex_id >= 0)
   {
-    file->writing = (mode == EX_WRITE);
+    file->writing = (mode & EX_CLOBBER);
     file->node_var_names = string_array_new();
     file->node_set_var_names = string_array_new();
     file->edge_var_names = string_array_new();
@@ -358,7 +385,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
 exodus_file_t* exodus_file_new(MPI_Comm comm,
                                const char* filename)
 {
-  return open_exodus_file(comm, filename, EX_WRITE);
+  return open_exodus_file(comm, filename, EX_CLOBBER | EX_NETCDF4);
 }
 
 exodus_file_t* exodus_file_open(MPI_Comm comm,
@@ -380,12 +407,12 @@ void exodus_file_close(exodus_file_t* file)
     time_t invocation_time = polymec_invocation_time();
     struct tm* time_data = localtime(&invocation_time);
     char date[20], instant[20];
-    snprintf(date, 19, "%2d/%2d/%2d", time_data->tm_mon, time_data->tm_mday, 
+    snprintf(date, 19, "%02d/%02d/%02d", time_data->tm_mon, time_data->tm_mday, 
              time_data->tm_year % 100);
-    qa_record[0][1] = string_dup(date);
-    snprintf(instant, 19, "%2d:%2d:%2d", time_data->tm_hour, time_data->tm_min, 
+    qa_record[0][2] = string_dup(date);
+    snprintf(instant, 19, "%02d:%02d:%02d", time_data->tm_hour, time_data->tm_min, 
              time_data->tm_sec % 60);
-    qa_record[0][1] = string_dup(instant);
+    qa_record[0][3] = string_dup(instant);
     ex_put_qa(file->ex_id, 1, qa_record);
     for (int i = 0; i < 4; ++i)
       string_free(qa_record[0][i]);
