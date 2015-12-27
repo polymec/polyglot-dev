@@ -524,6 +524,30 @@ void exodus_file_write_mesh(exodus_file_t* file,
     ex_put_name(file->ex_id, EX_FACE_BLOCK, 1, "face_block");
 
     // Write face->node connectivity information.
+    int num_faces = fe_mesh_num_faces(mesh);
+    int face_node_size = 0;
+    int num_face_nodes[num_faces];
+    for (int f = 0; f < num_faces; ++f)
+    {
+      int num_nodes = fe_mesh_num_face_nodes(mesh, f);
+      num_face_nodes[f] = num_nodes;
+      face_node_size += num_nodes;
+    }
+    int* face_nodes = polymec_malloc(sizeof(int) * face_node_size);
+    int offset = 0;
+    for (int f = 0; f < num_faces; ++f)
+    {
+      fe_mesh_get_face_nodes(mesh, f, &face_nodes[offset]);
+      offset += num_face_nodes[f];
+    }
+    for (int i = 0; i < face_node_size; ++i)
+      face_nodes[i] += 1;
+    ex_put_conn(file->ex_id, EX_FACE_BLOCK, 1, face_nodes, NULL, NULL);
+    polymec_free(face_nodes);
+
+    // Number of nodes per face.
+    ex_put_entity_count_per_polyhedra(file->ex_id, EX_FACE_BLOCK, 
+                                      file->face_block_ids[0], num_face_nodes); 
   }
 
   // Go over the element blocks and write out the data.
@@ -553,6 +577,8 @@ void exodus_file_write_mesh(exodus_file_t* file,
         fe_block_get_element_faces(block, i, &elem_faces[offset]);
         offset += faces_per_elem[i];
       }
+      for (int i = 0; i < tot_num_elem_faces; ++i)
+        elem_faces[i] += 1;
       ex_put_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, NULL, NULL, elem_faces);
       ex_put_entity_count_per_polyhedra(file->ex_id, EX_ELEM_BLOCK, elem_block, faces_per_elem); 
     }
@@ -574,6 +600,8 @@ void exodus_file_write_mesh(exodus_file_t* file,
         fe_block_get_element_nodes(block, i, &elem_nodes[offset]);
         offset += num_nodes_per_elem;
       }
+      for (int i = 0; i < num_elem * num_nodes_per_elem; ++i)
+        elem_nodes[i] += 1;
       ex_put_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, elem_nodes, NULL, NULL);
     }
 
@@ -665,7 +693,8 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
 
     // Find the number of nodes for each face in the block.
     int* num_face_nodes = polymec_malloc(sizeof(int) * num_faces);
-    ex_get_entity_count_per_polyhedra(file->ex_id, EX_FACE_BLOCK, 1, 
+    ex_get_entity_count_per_polyhedra(file->ex_id, EX_FACE_BLOCK, 
+                                      file->face_block_ids[0], 
                                       num_face_nodes);
 
     // Read face->node connectivity information.
@@ -674,6 +703,8 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
       face_node_size += num_face_nodes[i];
     int* face_nodes = polymec_malloc(sizeof(int) * face_node_size);
     ex_get_conn(file->ex_id, EX_FACE_BLOCK, 1, face_nodes, NULL, NULL);
+    for (int i = 0; i < face_node_size; ++i)
+      face_nodes[i] -= 1;
     fe_mesh_set_face_nodes(mesh, num_faces, num_face_nodes, face_nodes);
 
     // Clean up.
@@ -709,6 +740,10 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
       int* elem_faces = polymec_malloc(sizeof(int) * elem_face_size);
       ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, NULL, NULL, elem_faces);
 
+      // Subtract 1 from each element face.
+      for (int i = 0; i < elem_face_size; ++i)
+        elem_faces[i] -= 1;
+
       // Create the element block.
       block = fe_polyhedral_block_new(num_elem, num_elem_faces, elem_faces);
     }
@@ -718,6 +753,10 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
       int* node_conn = polymec_malloc(sizeof(int) * num_elem * num_nodes_per_elem);
       ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, node_conn, NULL, NULL);
       
+      // Subtract 1 from each element node.
+      for (int i = 0; i < num_elem * num_nodes_per_elem; ++i)
+        node_conn[i] -= 1;
+
       // Build the element block.
       block = fe_block_new(num_elem, elem_type, node_conn);
     }
@@ -816,10 +855,10 @@ void exodus_file_write_element_field(exodus_file_t* file,
 
   // Insert the data.
   int offset = 0;
-  for (int i = 1; i <= file->num_elem_blocks; ++i)
+  for (int i = 0; i < file->num_elem_blocks; ++i)
   {
     int N;
-    ex_get_block(file->ex_id, EX_ELEM_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+    ex_get_block(file->ex_id, EX_ELEM_BLOCK, file->elem_block_ids[i], NULL, &N, NULL, NULL, NULL, NULL);
     ex_put_var(file->ex_id, time_index, EX_ELEM_BLOCK, index+1, i, N, &field_data[offset]);
     offset += N;
   }
@@ -844,10 +883,10 @@ real_t* exodus_file_read_element_field(exodus_file_t* file,
     int offset = 0;
     real_t* field = polymec_malloc(sizeof(real_t) * file->num_elem);
     memset(field, 0, sizeof(real_t) * file->num_elem);
-    for (int i = 1; i <= file->num_elem_blocks; ++i)
+    for (int i = 0; i < file->num_elem_blocks; ++i)
     {
       int N;
-      ex_get_block(file->ex_id, EX_ELEM_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+      ex_get_block(file->ex_id, EX_ELEM_BLOCK, file->elem_block_ids[i], NULL, &N, NULL, NULL, NULL, NULL);
       ex_get_var(file->ex_id, time_index, EX_ELEM_BLOCK, index+1, i, N, &field[offset]);
       offset += N;
     }
@@ -892,10 +931,10 @@ void exodus_file_write_face_field(exodus_file_t* file,
 
   // Insert the data.
   int offset = 0;
-  for (int i = 1; i <= file->num_face_blocks; ++i)
+  for (int i = 0; i < file->num_face_blocks; ++i)
   {
     int N;
-    ex_get_block(file->ex_id, EX_FACE_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+    ex_get_block(file->ex_id, EX_FACE_BLOCK, file->face_block_ids[i], NULL, &N, NULL, NULL, NULL, NULL);
     ex_put_var(file->ex_id, time_index, EX_FACE_BLOCK, index+1, i, N, &field_data[offset]);
     offset += N;
   }
@@ -920,10 +959,10 @@ real_t* exodus_file_read_face_field(exodus_file_t* file,
     int offset = 0;
     real_t* field = polymec_malloc(sizeof(real_t) * file->num_faces);
     memset(field, 0, sizeof(real_t) * file->num_faces);
-    for (int i = 1; i <= file->num_face_blocks; ++i)
+    for (int i = 0; i < file->num_face_blocks; ++i)
     {
       int N;
-      ex_get_block(file->ex_id, EX_FACE_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+      ex_get_block(file->ex_id, EX_FACE_BLOCK, file->face_block_ids[i], NULL, &N, NULL, NULL, NULL, NULL);
       ex_get_var(file->ex_id, time_index, EX_FACE_BLOCK, index+1, i, N, &field[offset]);
       offset += N;
     }
@@ -968,10 +1007,10 @@ void exodus_file_write_edge_field(exodus_file_t* file,
 
   // Insert the data.
   int offset = 0;
-  for (int i = 1; i <= file->num_edge_blocks; ++i)
+  for (int i = 0; i < file->num_edge_blocks; ++i)
   {
     int N;
-    ex_get_block(file->ex_id, EX_EDGE_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+    ex_get_block(file->ex_id, EX_EDGE_BLOCK, file->edge_block_ids[i], NULL, &N, NULL, NULL, NULL, NULL);
     ex_put_var(file->ex_id, time_index, EX_EDGE_BLOCK, index+1, i, N, &field_data[offset]);
     offset += N;
   }
@@ -996,10 +1035,10 @@ real_t* exodus_file_read_edge_field(exodus_file_t* file,
     int offset = 0;
     real_t* field = polymec_malloc(sizeof(real_t) * file->num_edges);
     memset(field, 0, sizeof(real_t) * file->num_edges);
-    for (int i = 1; i <= file->num_edge_blocks; ++i)
+    for (int i = 0; i < file->num_edge_blocks; ++i)
     {
       int N;
-      ex_get_block(file->ex_id, EX_EDGE_BLOCK, i, NULL, &N, NULL, NULL, NULL, NULL);
+      ex_get_block(file->ex_id, EX_EDGE_BLOCK, file->edge_block_ids[i], NULL, &N, NULL, NULL, NULL, NULL);
       ex_get_var(file->ex_id, time_index, EX_EDGE_BLOCK, index+1, i, N, &field[offset]);
       offset += N;
     }

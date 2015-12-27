@@ -6,6 +6,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #include "core/array.h"
+#include "core/array_utils.h"
 #include "core/tagger.h"
 #include "polyglot/fe_mesh.h"
 
@@ -322,8 +323,13 @@ int fe_mesh_num_element_nodes(fe_mesh_t* mesh, int elem_index)
 
   // Find the block that houses this element.
   int b = 0;
-  while (mesh->block_elem_offsets->data[b+1] < elem_index)
-    ++b;
+  if (mesh->block_elem_offsets->size == 2)
+  {
+    while (((b+1) < mesh->block_elem_offsets->size) && 
+           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    if (b == mesh->block_elem_offsets->size-1)
+      return -1;
+  }
 
   // Now ask the block about the element.
   fe_block_t* block = mesh->blocks->data[b];
@@ -337,8 +343,13 @@ void fe_mesh_get_element_nodes(fe_mesh_t* mesh,
 {
   // Find the block that houses this element.
   int b = 0;
-  while (mesh->block_elem_offsets->data[b+1] < elem_index)
-    ++b;
+  if (mesh->block_elem_offsets->size == 2)
+  {
+    while (((b+1) < mesh->block_elem_offsets->size) && 
+           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    if (b == mesh->block_elem_offsets->size-1)
+      return;
+  }
 
   // Now ask the block about the element.
   fe_block_t* block = mesh->blocks->data[b];
@@ -350,8 +361,13 @@ int fe_mesh_num_element_faces(fe_mesh_t* mesh, int elem_index)
 {
   // Find the block that houses this element.
   int b = 0;
-  while (mesh->block_elem_offsets->data[b+1] < elem_index)
-    ++b;
+  if (mesh->block_elem_offsets->size == 2)
+  {
+    while (((b+1) < mesh->block_elem_offsets->size) && 
+           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    if (b == mesh->block_elem_offsets->size-1)
+      return -1;
+  }
 
   // Now ask the block about the element.
   fe_block_t* block = mesh->blocks->data[b];
@@ -365,8 +381,13 @@ void fe_mesh_get_element_faces(fe_mesh_t* mesh,
 {
   // Find the block that houses this element.
   int b = 0;
-  while (mesh->block_elem_offsets->data[b+1] < elem_index)
-    ++b;
+  if (mesh->block_elem_offsets->size == 2)
+  {
+    while (((b+1) < mesh->block_elem_offsets->size) && 
+           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    if (b == mesh->block_elem_offsets->size-1)
+      return;
+  }
 
   // Now ask the block about the element.
   fe_block_t* block = mesh->blocks->data[b];
@@ -378,8 +399,13 @@ int fe_mesh_num_element_edges(fe_mesh_t* mesh, int elem_index)
 {
   // Find the block that houses this element.
   int b = 0;
-  while (mesh->block_elem_offsets->data[b+1] < elem_index)
-    ++b;
+  if (mesh->block_elem_offsets->size == 2)
+  {
+    while (((b+1) < mesh->block_elem_offsets->size) && 
+           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    if (b == mesh->block_elem_offsets->size-1)
+      return -1;
+  }
 
   // Now ask the block about the element.
   fe_block_t* block = mesh->blocks->data[b];
@@ -393,8 +419,13 @@ void fe_mesh_get_element_edges(fe_mesh_t* mesh,
 {
   // Find the block that houses this element.
   int b = 0;
-  while (mesh->block_elem_offsets->data[b+1] < elem_index)
-    ++b;
+  if (mesh->block_elem_offsets->size == 2)
+  {
+    while (((b+1) < mesh->block_elem_offsets->size) && 
+           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    if (b == mesh->block_elem_offsets->size-1)
+      return;
+  }
 
   // Now ask the block about the element.
   fe_block_t* block = mesh->blocks->data[b];
