@@ -630,27 +630,119 @@ serializer_t* fe_mesh_serializer()
 
 mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
 {
+  // Feel out the faces for the finite element mesh. Do we need to create 
+  // them ourselves, or are they already all there?
+  int num_cells = fe_mesh_num_elements(fe_mesh);
+  int num_faces = fe_mesh_num_faces(fe_mesh);
+  int* cell_face_offsets = NULL;
+  int* cell_faces = NULL;
+  int* face_node_offsets = NULL;
+  int* face_nodes = NULL;
+  if (num_faces == 0)
+  {
+    // This is a nodal finite element mesh, so we need to assemble the faces ourselves.
+    polymec_not_implemented("nodal finite element mesh conversion");
+
+    // Traverse the element blocks and create faces.
+    int pos = 0, elem_offset = 0;
+    char* block_name;
+    fe_block_t* block;
+    while (fe_mesh_next_block(fe_mesh, &pos, &block_name, &block))
+    {
+      int num_block_elem = fe_block_num_elements(block);
+      fe_mesh_element_t elem_type = fe_block_element_type(block);
+
+      elem_offset += num_block_elem;
+    }
+
+    // Now identify the nodes for each face.
+  }
+  else
+  {
+    // Fill in these arrays block by block.
+    cell_face_offsets = polymec_malloc(sizeof(int) * (num_cells + 1));
+    cell_face_offsets[0] = 0;
+    int pos = 0;
+    char* block_name;
+    fe_block_t* block;
+    int block_cell_offset = 0;
+    while (fe_mesh_next_block(fe_mesh, &pos, &block_name, &block))
+    {
+      int num_block_elem = fe_block_num_elements(block);
+      for (int i = 0; i < num_block_elem; ++i)
+        cell_face_offsets[block_cell_offset+i] = cell_face_offsets[block_cell_offset+i-1] + block->elem_face_offsets[i];
+      block_cell_offset += num_block_elem;
+    }
+
+    cell_faces = polymec_malloc(sizeof(int) * cell_face_offsets[num_cells]);
+    pos = 0, block_cell_offset = 0;
+    while (fe_mesh_next_block(fe_mesh, &pos, &block_name, &block))
+    {
+      int num_block_elem = fe_block_num_elements(block);
+      memcpy(&cell_faces[cell_face_offsets[block_cell_offset]], block->elem_faces, sizeof(int) * block->elem_face_offsets[num_block_elem]);
+      block_cell_offset += num_block_elem;
+    }
+
+    // We just borrow these from the mesh. Theeenks!
+    face_node_offsets = fe_mesh->face_node_offsets;
+    face_nodes = fe_mesh->face_nodes;
+  }
+  ASSERT(cell_face_offsets != NULL);
+  ASSERT(cell_faces != NULL);
+  ASSERT(face_node_offsets != NULL);
+  ASSERT(face_nodes != NULL);
+
+  int num_ghost_cells = 0; // FIXME!
   mesh_t* mesh = mesh_new(fe_mesh_comm(fe_mesh), 
-                          fe_mesh_num_elements(fe_mesh), 0, // FIXME: Figure out ghosts!
+                          num_cells, num_ghost_cells, 
                           fe_mesh_num_faces(fe_mesh),
                           fe_mesh_num_nodes(fe_mesh));
+  memcpy(mesh->cell_face_offsets, cell_face_offsets, sizeof(int) * (mesh->num_cells+1));
+  memcpy(mesh->face_node_offsets, face_node_offsets, sizeof(int) * (mesh->num_faces+1));
+  mesh_reserve_connectivity_storage(mesh);
+  memcpy(mesh->cell_faces, cell_faces, sizeof(int) * (mesh->cell_face_offsets[mesh->num_cells]));
+  memcpy(mesh->face_nodes, face_nodes, sizeof(int) * (mesh->face_node_offsets[mesh->num_faces]));
 
-  // Set up cell->face and face->cell connectivity.
-
-  // Set up face->node connectivity.
+  // Set up face->cell connectivity.
+  for (int c = 0; c < mesh->num_cells; ++c)
+  {
+    for (int f = mesh->cell_face_offsets[c]; f < mesh->cell_face_offsets[c+1]; ++f)
+    {
+      int face = mesh->cell_faces[f];
+      if (mesh->face_cells[2*face] == -1)
+        mesh->face_cells[2*face] = c;
+      else
+        mesh->face_cells[2*face+1] = c;
+    }
+  }
 
   // Set up face->edge connectivity and edge->node connectivity (if provided).
-  bool found_edges = false;
-
-  // Construct edges if we didn't find them.
-  if (!found_edges)
+  if (fe_mesh->face_edges != NULL)
+  {
+    memcpy(mesh->face_edge_offsets, fe_mesh->face_edge_offsets, sizeof(int) * (mesh->num_faces+1));
+    mesh->face_edges = polymec_malloc(sizeof(int) * fe_mesh->face_edge_offsets[mesh->num_faces]);
+    memcpy(mesh->face_edges, fe_mesh->face_edges, sizeof(int) * fe_mesh->face_edge_offsets[mesh->num_faces]);
+  }
+  else
+  {
+    // Construct edges if we didn't find them.
     mesh_construct_edges(mesh);
+  }
 
   // Copy the node positions into place.
   memcpy(mesh->nodes, fe_mesh_node_positions(fe_mesh), sizeof(point_t) * mesh->num_nodes);
 
   // Calculate geometry.
   mesh_compute_geometry(mesh);
+
+  // Clean up.
+  polymec_free(cell_face_offsets);
+  polymec_free(cell_faces);
+  if (fe_mesh_num_faces(fe_mesh) == 0)
+  {
+    polymec_free(face_node_offsets);
+    polymec_free(face_nodes);
+  }
 
   return mesh;
 }
@@ -659,6 +751,51 @@ fe_mesh_t* fe_mesh_from_mesh(mesh_t* fv_mesh,
                              string_array_t* element_block_tags)
 {
   fe_mesh_t* fe_mesh = fe_mesh_new(fv_mesh->comm, fv_mesh->num_nodes);
+
+  if ((element_block_tags != NULL) && (element_block_tags->size > 1))
+  {
+    // Block-by-block construction.
+    for (int b = 0; b < element_block_tags->size; ++b)
+    {
+      char* tag_name = element_block_tags->data[b];
+      int num_elem;
+      int* block_tag = mesh_tag(fv_mesh->cell_tags, tag_name, &num_elem);
+      int* num_elem_faces = polymec_malloc(sizeof(int) * num_elem);
+      int elem_faces_size = 0;
+      for (int i = 0; i < num_elem; ++i)
+      {
+        int nef = fv_mesh->cell_face_offsets[block_tag[i]+1] - fv_mesh->cell_face_offsets[block_tag[i]];
+        num_elem_faces[i] = nef;
+        elem_faces_size += nef;
+      }
+      int* elem_faces = polymec_malloc(sizeof(int) * elem_faces_size);
+      int offset = 0;
+      for (int i = 0; i < num_elem; ++i)
+      {
+        for (int f = 0; f < num_elem_faces[i]; ++f, ++offset)
+          elem_faces[offset+f] = fv_mesh->cell_faces[fv_mesh->cell_face_offsets[block_tag[i]+f]];
+      }
+      fe_block_t* block = polyhedral_fe_block_new(num_elem, num_elem_faces, fv_mesh->cell_faces);
+      fe_mesh_add_block(fe_mesh, tag_name, block);
+      polymec_free(num_elem_faces);
+      polymec_free(elem_faces);
+    }
+  }
+  else
+  {
+    // One honking block.
+    int num_elem = fv_mesh->num_cells;
+    int* num_elem_faces = polymec_malloc(sizeof(int) * num_elem);
+    for (int i = 0; i < num_elem; ++i)
+      num_elem_faces[i] = fv_mesh->cell_face_offsets[i+1] - fv_mesh->cell_face_offsets[i];
+    fe_block_t* block = polyhedral_fe_block_new(num_elem, num_elem_faces, fv_mesh->cell_faces);
+    fe_mesh_add_block(fe_mesh, "block_1", block);
+    polymec_free(num_elem_faces);
+  }
+
+  // Copy coordinates.
+  memcpy(fe_mesh_node_positions(fe_mesh), fv_mesh->nodes, sizeof(point_t) * fv_mesh->num_nodes);
+
   return fe_mesh;
 }
 
