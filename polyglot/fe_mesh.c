@@ -188,7 +188,7 @@ struct fe_mesh_t
   // mesh -> block element index mapping.
   int_array_t* block_elem_offsets;
 
-  // Nodal coordinates.
+  // Nodal positions.
   int num_nodes;
   point_t* node_coords;
 
@@ -282,6 +282,11 @@ fe_mesh_t* fe_mesh_clone(fe_mesh_t* mesh)
   copy->node_coords = polymec_malloc(sizeof(point_t) * copy->num_nodes);
   memcpy(copy->node_coords, mesh->node_coords, sizeof(point_t) * copy->num_nodes);
   return copy;
+}
+
+MPI_Comm fe_mesh_comm(fe_mesh_t* mesh)
+{
+  return mesh->comm;
 }
 
 void fe_mesh_add_block(fe_mesh_t* mesh, 
@@ -513,7 +518,7 @@ int fe_mesh_num_nodes(fe_mesh_t* mesh)
   return mesh->num_nodes;
 }
 
-point_t* fe_mesh_node_coordinates(fe_mesh_t* mesh)
+point_t* fe_mesh_node_positions(fe_mesh_t* mesh)
 {
   return mesh->node_coords;
 }
@@ -621,5 +626,39 @@ bool fe_mesh_next_side_set(fe_mesh_t* mesh, int* pos, char** name, int** set, in
 serializer_t* fe_mesh_serializer()
 {
   return serializer_new("fe_mesh", NULL, NULL, NULL, NULL);
+}
+
+mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
+{
+  mesh_t* mesh = mesh_new(fe_mesh_comm(fe_mesh), 
+                          fe_mesh_num_elements(fe_mesh), 0, // FIXME: Figure out ghosts!
+                          fe_mesh_num_faces(fe_mesh),
+                          fe_mesh_num_nodes(fe_mesh));
+
+  // Set up cell->face and face->cell connectivity.
+
+  // Set up face->node connectivity.
+
+  // Set up face->edge connectivity and edge->node connectivity (if provided).
+  bool found_edges = false;
+
+  // Construct edges if we didn't find them.
+  if (!found_edges)
+    mesh_construct_edges(mesh);
+
+  // Copy the node positions into place.
+  memcpy(mesh->nodes, fe_mesh_node_positions(fe_mesh), sizeof(point_t) * mesh->num_nodes);
+
+  // Calculate geometry.
+  mesh_compute_geometry(mesh);
+
+  return mesh;
+}
+
+fe_mesh_t* fe_mesh_from_mesh(mesh_t* fv_mesh,
+                             string_array_t* element_block_tags)
+{
+  fe_mesh_t* fe_mesh = fe_mesh_new(fv_mesh->comm, fv_mesh->num_nodes);
+  return fe_mesh;
 }
 

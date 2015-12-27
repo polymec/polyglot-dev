@@ -614,7 +614,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
 
   // Set node positions.
   real_t x[file->num_nodes], y[file->num_nodes], z[file->num_nodes];
-  point_t* X = fe_mesh_node_coordinates(mesh);
+  point_t* X = fe_mesh_node_positions(mesh);
   for (int n = 0; n < file->num_nodes; ++n)
   {
     x[n] = X[n].x;
@@ -784,7 +784,7 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
   // Fetch node positions and compute geometry.
   real_t x[file->num_nodes], y[file->num_nodes], z[file->num_nodes];
   ex_get_coord(file->ex_id, x, y, z);
-  point_t* X = fe_mesh_node_coordinates(mesh);
+  point_t* X = fe_mesh_node_positions(mesh);
   for (int n = 0; n < file->num_nodes; ++n)
   {
     X[n].x = x[n];

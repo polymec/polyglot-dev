@@ -8,8 +8,8 @@
 #ifndef POLYGLOT_FE_MESH_H
 #define POLYGLOT_FE_MESH_H
 
-#include "core/point.h"
-#include "core/serializer.h"
+#include "core/mesh.h"
+#include "core/array.h"
 #include "polyglot/polyglot.h"
 
 // This type identifies the various types of (3D) finite elements in an fe_mesh.
@@ -121,6 +121,9 @@ void fe_mesh_free(fe_mesh_t* mesh);
 // Returns an exact copy of the given finite element mesh.
 fe_mesh_t* fe_mesh_clone(fe_mesh_t* mesh);
 
+// Returns the MPI communicator used by this mesh.
+MPI_Comm fe_mesh_comm(fe_mesh_t* mesh);
+
 // Adds the given element block to the mesh. Each element block defines its 
 // set of elements by connecting nodes in the underlying mesh, so each of 
 // these nodes must be available.
@@ -224,7 +227,7 @@ void fe_mesh_set_face_nodes(fe_mesh_t* mesh,
 
 // Returns an internal pointer to the set of points defining the positions 
 // of the nodes within the mesh.
-point_t* fe_mesh_node_coordinates(fe_mesh_t* mesh);
+point_t* fe_mesh_node_positions(fe_mesh_t* mesh);
 
 // Returns the number of element sets in the mesh.
 int fe_mesh_num_element_sets(fe_mesh_t* mesh); 
@@ -285,6 +288,17 @@ bool fe_mesh_next_side_set(fe_mesh_t* mesh, int* pos, char** name, int** set, in
 // Returns a serializer object that can read/write finite element meshes 
 // from/to byte arrays.
 serializer_t* fe_mesh_serializer();
+
+// This function creates a (finite volume arbitrary polyhedral) mesh from
+// the given finite element mesh. 
+mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh);
+
+// This function creates a finite element mesh from the given (finite volume 
+// arbitrary polyhedral) mesh. If specified, the list of cell tags 
+// identifies the tags whose cells will belong to the element blocks of 
+// the mesh.
+fe_mesh_t* fe_mesh_from_mesh(mesh_t* fv_mesh,
+                             string_array_t* element_block_tags);
 
 #endif
 

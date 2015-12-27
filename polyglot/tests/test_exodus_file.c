@@ -95,7 +95,7 @@ void test_write_poly_exodus_file(void** state)
                       11, 10, 10, 11, 9, 8, 8, 9, 13, 12, 12, 13, 3, 2};
   fe_mesh_set_face_nodes(mesh, 15, num_face_nodes, face_nodes);
 
-  point_t* X = fe_mesh_node_coordinates(mesh);
+  point_t* X = fe_mesh_node_positions(mesh);
   X[ 0].x = 0.0; X[ 0].y = 0.0; X[ 0].z = 0.0;
   X[ 1].x = 2.0; X[ 1].y = 0.0; X[ 1].z = 0.0;
   X[ 2].x = 0.0; X[ 2].y = 2.0; X[ 2].z = 0.0;
