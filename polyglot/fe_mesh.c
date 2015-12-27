@@ -222,6 +222,16 @@ fe_mesh_t* fe_mesh_new(MPI_Comm comm, int num_nodes)
   int_array_append(mesh->block_elem_offsets, 0);
   mesh->node_coords = polymec_malloc(sizeof(point_t) * mesh->num_nodes);
 
+  mesh->num_faces = 0;
+  mesh->face_node_offsets = NULL;
+  mesh->face_nodes = NULL;
+  mesh->face_edge_offsets = NULL;
+  mesh->face_edges = NULL;
+
+  mesh->num_edges = 0;
+  mesh->edge_node_offsets = NULL;
+  mesh->edge_nodes = NULL;
+
   mesh->elem_sets = tagger_new();
   mesh->face_sets = tagger_new();
   mesh->edge_sets = tagger_new();

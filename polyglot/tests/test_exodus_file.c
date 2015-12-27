@@ -29,10 +29,19 @@ void test_exodus_file_query(void** state)
 
 void test_read_exodus_file(void** state)
 {
+  exodus_file_t* file = exodus_file_open(MPI_COMM_WORLD, "test-nfaced.exo");
+  assert_true(file != NULL);
+  assert_true(strcmp(exodus_file_title(file), "This is a test") == 0);
+  fe_mesh_t* mesh = exodus_file_read_mesh(file);
+  fe_mesh_free(mesh);
+  exodus_file_close(file);
 }
 
 void test_write_exodus_file(void** state)
 {
+  exodus_file_t* file = exodus_file_new(MPI_COMM_WORLD, "test-nfaced-2.exo");
+  assert_true(file != NULL);
+  exodus_file_close(file);
 }
 
 int main(int argc, char* argv[]) 

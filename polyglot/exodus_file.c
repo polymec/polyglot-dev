@@ -140,6 +140,9 @@ struct exodus_file_t
   int num_nodes, num_edges, num_faces, num_elem, 
       num_elem_blocks, num_face_blocks, num_edge_blocks,
       num_elem_sets, num_face_sets, num_edge_sets, num_node_sets, num_side_sets;
+  int* elem_block_ids;
+  int* face_block_ids;
+  int* edge_block_ids;
 
   // Variable names.
   string_array_t *node_var_names, *node_set_var_names,
@@ -310,11 +313,18 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
         file->num_faces = mesh_info.num_face;
         file->num_edges = mesh_info.num_edge;
         file->num_elem_blocks = mesh_info.num_elem_blk;
+        file->elem_block_ids = polymec_malloc(sizeof(int) * file->num_elem_blocks);
+        ex_get_ids(file->ex_id, EX_ELEM_BLOCK, file->elem_block_ids);
         file->num_face_blocks = mesh_info.num_face_blk;
+        file->face_block_ids = polymec_malloc(sizeof(int) * file->num_face_blocks);
+        ex_get_ids(file->ex_id, EX_FACE_BLOCK, file->face_block_ids);
         file->num_edge_blocks = mesh_info.num_edge_blk;
+        file->edge_block_ids = polymec_malloc(sizeof(int) * file->num_edge_blocks);
+        ex_get_ids(file->ex_id, EX_EDGE_BLOCK, file->edge_block_ids);
         file->num_elem_sets = mesh_info.num_elem_sets;
         file->num_face_sets = mesh_info.num_face_sets;
         file->num_edge_sets = mesh_info.num_edge_sets;
+        file->num_node_sets = mesh_info.num_node_sets;
         file->num_side_sets = mesh_info.num_side_sets;
       }
     }
@@ -322,6 +332,18 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
     {
       // By default, the title of the database is its filename.
       strncpy(file->title, filename, MAX_NAME_LENGTH);
+      file->num_nodes = 0;
+      file->num_edges = 0;
+      file->num_faces = 0;
+      file->num_elem = 0;
+      file->elem_block_ids = 0;
+      file->face_block_ids = 0;
+      file->edge_block_ids = 0;
+      file->num_elem_sets = 0;
+      file->num_face_sets = 0;
+      file->num_edge_sets = 0;
+      file->num_node_sets = 0;
+      file->num_side_sets = 0;
     }
   }
   else
@@ -342,6 +364,8 @@ exodus_file_t* exodus_file_new(MPI_Comm comm,
 exodus_file_t* exodus_file_open(MPI_Comm comm,
                                 const char* filename)
 {
+  if (!file_exists(filename))
+    polymec_error("exodus_file_open: %s does not exist.", filename);
   return open_exodus_file(comm, filename, EX_READ);
 }
 
@@ -368,6 +392,12 @@ void exodus_file_close(exodus_file_t* file)
   }
 
   // Clean up.
+  if (file->elem_block_ids != NULL)
+    polymec_free(file->elem_block_ids);
+  if (file->face_block_ids != NULL)
+    polymec_free(file->face_block_ids);
+  if (file->edge_block_ids != NULL)
+    polymec_free(file->edge_block_ids);
   free_all_variable_names(file);
 #if POLYMEC_HAVE_MPI
   MPI_Info_free(&file->mpi_info);
@@ -410,8 +440,8 @@ static void write_set(exodus_file_t* file,
   }
 }
 
-void exodus_file_write_fe_mesh(exodus_file_t* file,
-                               fe_mesh_t* mesh)
+void exodus_file_write_mesh(exodus_file_t* file,
+                            fe_mesh_t* mesh)
 {
   ASSERT(file->writing);
 
@@ -569,15 +599,16 @@ static void fetch_set(exodus_file_t* file,
   ex_get_set(file->ex_id, EX_ELEM_SET, set_id, set, NULL);
 }
 
-fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
+fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
 {
   // Create the "host" FE mesh.
   fe_mesh_t* mesh = fe_mesh_new(file->comm, file->num_nodes);
 
   // Count up the number of polyhedral blocks.
   int num_poly_blocks = 0;
-  for (int elem_block = 1; elem_block <= file->num_elem_blocks; ++elem_block)
+  for (int i = 0; i < file->num_elem_blocks; ++i)
   {
+    int elem_block = file->elem_block_ids[i];
     char elem_type_name[MAX_NAME_LENGTH+1];
     int num_elem, num_nodes_per_elem, num_faces_per_elem;
     ex_get_block(file->ex_id, EX_ELEM_BLOCK, elem_block, 
@@ -596,7 +627,7 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
     // Dig up the face block corresponding to this element block.
     char face_type[MAX_NAME_LENGTH+1];
     int num_faces, num_nodes;
-    ex_get_block(file->ex_id, EX_FACE_BLOCK, 1, face_type, &num_faces,
+    ex_get_block(file->ex_id, EX_FACE_BLOCK, file->face_block_ids[0], face_type, &num_faces,
                  &num_nodes, NULL, NULL, NULL);
     if (string_ncasecmp(face_type, "nsided", 6) != 0)
     {
@@ -623,8 +654,9 @@ fe_mesh_t* exodus_file_read_fe_mesh(exodus_file_t* file)
   }
 
   // Go over the element blocks and feel out the data.
-  for (int elem_block = 1; elem_block <= file->num_elem_blocks; ++elem_block)
+  for (int i = 0; i < file->num_elem_blocks; ++i)
   {
+    int elem_block = file->elem_block_ids[i];
     char elem_type_name[MAX_NAME_LENGTH+1];
     int num_elem, num_nodes_per_elem, num_faces_per_elem;
     ex_get_block(file->ex_id, EX_ELEM_BLOCK, elem_block, 

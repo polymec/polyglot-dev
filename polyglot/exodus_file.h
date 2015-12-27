@@ -48,8 +48,8 @@ void exodus_file_set_title(exodus_file_t* file, const char* title);
 // Writes a finite element mesh to the given Exodus file, overwriting 
 // any existing mesh there. All cells (or "elements") are written to a single 
 // element block within the Exodus mesh.
-void exodus_file_write_fe_mesh(exodus_file_t* file,
-                               fe_mesh_t* mesh);
+void exodus_file_write_mesh(exodus_file_t* file,
+                            fe_mesh_t* mesh);
 
 // Reads a finite element mesh from the given Exodus file, returning 
 // a newly-allocated object.
