@@ -429,12 +429,30 @@ static void write_set(exodus_file_t* file,
   ex_put_name(file->ex_id, set_type, (ex_entity_id)set_id, set_name);
 }
 
+// This helper determines whether the given element type can have the given 
+// number of nodes in an Exodus file.
+static bool element_is_supported(fe_mesh_element_t elem_type, 
+                                 int num_elem_nodes)
+{
+  if (elem_type == FE_TETRAHEDRON)
+    return ((num_elem_nodes == 4) || (num_elem_nodes == 10) || (num_elem_nodes == 11));
+  else if (elem_type == FE_PYRAMID)
+    return ((num_elem_nodes == 5) || (num_elem_nodes == 13));
+  else if (elem_type == FE_WEDGE)
+    return ((num_elem_nodes == 6) || (num_elem_nodes == 15) || (num_elem_nodes == 16));
+  else if (elem_type == FE_HEXAHEDRON)
+    return ((num_elem_nodes == 8) || (num_elem_nodes == 20) || (num_elem_nodes == 21));
+  else
+    return false;
+}
+
 void exodus_file_write_mesh(exodus_file_t* file,
                             fe_mesh_t* mesh)
 {
   ASSERT(file->writing);
 
-  // Count up the number of polyhedral blocks.
+  // See whether we have polyhedral blocks, and whether the non-polyhedral
+  // blocks have supported element types.
   int num_blocks = fe_mesh_num_blocks(mesh);
   bool is_polyhedral = false;
   int pos = 0;
@@ -448,6 +466,14 @@ void exodus_file_write_mesh(exodus_file_t* file,
       is_polyhedral = true;
       break;
     }
+    else if (elem_type != FE_INVALID)
+    {
+      // Check the number of nodes for the element.
+      if (!element_is_supported(elem_type, fe_block_num_element_nodes(block, 0)))
+        polymec_error("exodus_file_write_mesh: Element type in block %s has invalid number of nodes.", block_name);
+    }
+    else
+      polymec_error("exodus_file_write_mesh: Invalid element type for block %s.", block_name);
   }
 
   // Write out information about elements, faces, edges, nodes.
@@ -480,15 +506,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
   // block that incorporates all of the polyhedral elements.
   if (is_polyhedral)
   {
-    int num_poly_faces = 0, tot_poly_face_nodes = 0;
-    // FIXME
-
-    // Write an "nsided" face block.
-    ex_put_block(file->ex_id, EX_FACE_BLOCK, 1, "nsided",
-                 num_poly_faces, tot_poly_face_nodes, 0, 0, 0);
-    ex_put_name(file->ex_id, EX_FACE_BLOCK, 1, "face_block");
-
-    // Write face->node connectivity information.
+    // Generate face->node connectivity information.
     int num_faces = fe_mesh_num_faces(mesh);
     int face_node_size = 0;
     int num_face_nodes[num_faces];
@@ -507,7 +525,14 @@ void exodus_file_write_mesh(exodus_file_t* file,
     }
     for (int i = 0; i < face_node_size; ++i)
       face_nodes[i] += 1;
+
+    // Write an "nsided" face block.
+    ex_put_block(file->ex_id, EX_FACE_BLOCK, 1, "nsided",
+                 num_faces, face_node_size, 0, 0, 0);
+    ex_put_name(file->ex_id, EX_FACE_BLOCK, 1, "face_block");
     ex_put_conn(file->ex_id, EX_FACE_BLOCK, 1, face_nodes, NULL, NULL);
+
+    // Clean up.
     polymec_free(face_nodes);
 
     // Number of nodes per face.

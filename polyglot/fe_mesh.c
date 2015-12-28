@@ -76,7 +76,8 @@ fe_block_t* polyhedral_fe_block_new(int num_elem,
   block->elem_faces = polymec_malloc(sizeof(int) * block->elem_face_offsets[num_elem]);
   memcpy(block->elem_faces, elem_face_indices, sizeof(int) * block->elem_face_offsets[num_elem]);
 
-  // Element nodes are not determined until the block is added to the mesh.
+  // Element nodes/edges are not determined until the block is added to 
+  // the mesh.
   block->elem_node_offsets = NULL;
   block->elem_nodes = NULL;
 
@@ -608,13 +609,224 @@ serializer_t* fe_mesh_serializer()
   return serializer_new("fe_mesh", NULL, NULL, NULL, NULL);
 }
 
+//------------------------------------------------------------------------
+//              Finite Element -> Finite Volume Mesh Translation
+//------------------------------------------------------------------------
+
+// Non-polyhedral face construction information.
+static int get_num_cell_faces(fe_mesh_element_t elem_type)
+{
+  ASSERT(elem_type != FE_INVALID);
+  ASSERT(elem_type != FE_POLYHEDRON);
+  if (elem_type == FE_TETRAHEDRON)
+    return 4;
+  else if ((elem_type == FE_PYRAMID) || (elem_type == FE_WEDGE))
+    return 5;
+  else 
+  {
+    ASSERT(elem_type == FE_HEXAHEDRON);
+    return 6;
+  }
+}
+
+// Returns true if t1 and t2 are the same size and contain the same numbers 
+// (regardless of order). Specific to 3- and 4-tuples.
+static bool tuples_are_equivalent(int* t1, int* t2)
+{
+  int l1 = int_tuple_length(t1);
+  ASSERT((l1 == 3) || (l1 == 4));
+  if (l1 == int_tuple_length(t2))
+  {
+    if (l1 == 3)
+    {
+      return (((t1[0] == t2[0]) || (t1[0] == t2[1]) || (t1[0] == t2[2])) &&
+              ((t1[1] == t2[0]) || (t1[1] == t2[1]) || (t1[1] == t2[2])) &&
+              ((t1[2] == t2[0]) || (t1[2] == t2[1]) || (t1[2] == t2[2])));
+    }
+    else
+    {
+      return (((t1[0] == t2[0]) || (t1[0] == t2[1]) || (t1[0] == t2[2]) || (t1[0] == t2[3])) &&
+              ((t1[1] == t2[0]) || (t1[1] == t2[1]) || (t1[1] == t2[2]) || (t1[1] == t2[3])) &&
+              ((t1[2] == t2[0]) || (t1[2] == t2[1]) || (t1[2] == t2[2]) || (t1[2] == t2[3])) &&
+              ((t1[3] == t2[0]) || (t1[3] == t2[1]) || (t1[3] == t2[2]) || (t1[3] == t2[3])));
+    }
+  }
+  else
+    return false;
+}
+
+static int map_nodes_to_face(int_tuple_int_unordered_map_t* node_face_map,
+                             int* nodes,
+                             int num_nodes)
+{
+  // Sort the nodes and see if they appear in the node face map.
+  int* sorted_nodes = int_tuple_new(num_nodes);
+  memcpy(sorted_nodes, nodes, sizeof(int) * num_nodes);
+  int_qsort(sorted_nodes, num_nodes);
+  int* entry = int_tuple_int_unordered_map_get(node_face_map, sorted_nodes);
+  int face_index;
+  if (entry == NULL)
+  {
+    face_index = node_face_map->size;
+    int_tuple_int_unordered_map_insert_with_k_dtor(node_face_map, sorted_nodes, face_index, int_tuple_free);
+  }
+  else
+  {
+    face_index = *entry;
+    int_tuple_free(sorted_nodes);
+  }
+  return face_index;
+}
+
+static void get_cell_faces(fe_mesh_element_t elem_type,
+                           int* elem_nodes,
+                           int_tuple_int_unordered_map_t* node_face_map,
+                           int* cell_faces,
+                           int_array_t* face_node_offsets,
+                           int_array_t* face_nodes)
+{
+  ASSERT(elem_type != FE_INVALID);
+  ASSERT(elem_type != FE_POLYHEDRON);
+  if (elem_type == FE_TETRAHEDRON)
+  {
+    // We have 4 significant nodes. Craft the faces for this element.
+    int face_node_indices[4][3] = {{elem_nodes[0], elem_nodes[1], elem_nodes[2]},
+                                   {elem_nodes[0], elem_nodes[1], elem_nodes[3]},
+                                   {elem_nodes[1], elem_nodes[2], elem_nodes[3]},
+                                   {elem_nodes[2], elem_nodes[0], elem_nodes[3]}};
+    for (int f = 0; f < 4; ++f)
+    {
+      // Get the index of the face.
+      int face_index = map_nodes_to_face(node_face_map, face_node_indices[f], 3);
+
+      // Record the cell->face connectivity.
+      cell_faces[f] = face_index;
+
+      // Record the face->node connectivity.
+      int_array_append(face_node_offsets, 3);
+      int_array_append(face_nodes, face_node_indices[f][0]);
+      int_array_append(face_nodes, face_node_indices[f][1]);
+      int_array_append(face_nodes, face_node_indices[f][2]);
+    }
+  }
+  else if (elem_type == FE_PYRAMID)
+  {
+    // We have 5 significant nodes. Craft the faces for this element.
+    int base_face_nodes[4] = {elem_nodes[0], elem_nodes[1], elem_nodes[2], elem_nodes[3]};
+    int side_face_nodes[4][3] = {{elem_nodes[0], elem_nodes[1], elem_nodes[4]},
+                                 {elem_nodes[1], elem_nodes[2], elem_nodes[4]},
+                                 {elem_nodes[2], elem_nodes[3], elem_nodes[4]},
+                                 {elem_nodes[3], elem_nodes[0], elem_nodes[4]}};
+    // Base face.
+    {
+      // Get the index of the face.
+      int face_index = map_nodes_to_face(node_face_map, base_face_nodes, 4);
+
+      // Record the cell->face connectivity.
+      cell_faces[0] = face_index;
+
+      // Record the face->node connectivity.
+      int_array_append(face_node_offsets, 4);
+      int_array_append(face_nodes, base_face_nodes[0]);
+      int_array_append(face_nodes, base_face_nodes[1]);
+      int_array_append(face_nodes, base_face_nodes[2]);
+      int_array_append(face_nodes, base_face_nodes[3]);
+    }
+
+    // Side faces.
+    for (int f = 0; f < 4; ++f)
+    {
+      // Get the index of the face.
+      int face_index = map_nodes_to_face(node_face_map, side_face_nodes[f], 3);
+
+      // Record the cell->face connectivity.
+      cell_faces[1+f] = face_index;
+
+      // Record the face->node connectivity.
+      int_array_append(face_node_offsets, 3);
+      int_array_append(face_nodes, side_face_nodes[f][0]);
+      int_array_append(face_nodes, side_face_nodes[f][1]);
+      int_array_append(face_nodes, side_face_nodes[f][2]);
+    }
+  }
+  else if (elem_type == FE_WEDGE)
+  {
+    // We have 6 significant nodes. Craft the faces for this element.
+    int base_face_nodes[2][3] = {{elem_nodes[0], elem_nodes[1], elem_nodes[2]},
+                                 {elem_nodes[3], elem_nodes[4], elem_nodes[5]}};
+    int side_face_nodes[3][4] = {{elem_nodes[0], elem_nodes[1], elem_nodes[4], elem_nodes[3]},
+                                 {elem_nodes[1], elem_nodes[2], elem_nodes[5], elem_nodes[4]},
+                                 {elem_nodes[2], elem_nodes[0], elem_nodes[3], elem_nodes[5]}};
+    // Base faces.
+    for (int f = 0; f < 2; ++f)
+    {
+      // Get the index of the face.
+      int face_index = map_nodes_to_face(node_face_map, base_face_nodes[f], 3);
+
+      // Record the cell->face connectivity.
+      cell_faces[f] = face_index;
+
+      // Record the face->node connectivity.
+      int_array_append(face_node_offsets, 3);
+      int_array_append(face_nodes, base_face_nodes[f][0]);
+      int_array_append(face_nodes, base_face_nodes[f][1]);
+      int_array_append(face_nodes, base_face_nodes[f][2]);
+    }
+
+    // Side faces.
+    for (int f = 0; f < 3; ++f)
+    {
+      // Get the index of the face.
+      int face_index = map_nodes_to_face(node_face_map, side_face_nodes[f], 4);
+
+      // Record the cell->face connectivity.
+      cell_faces[2+f] = face_index;
+
+      // Record the face->node connectivity.
+      int_array_append(face_node_offsets, 4);
+      int_array_append(face_nodes, side_face_nodes[f][0]);
+      int_array_append(face_nodes, side_face_nodes[f][1]);
+      int_array_append(face_nodes, side_face_nodes[f][2]);
+      int_array_append(face_nodes, side_face_nodes[f][3]);
+    }
+  }
+  else 
+  {
+    ASSERT(elem_type == FE_HEXAHEDRON);
+
+    // We have 8 significant nodes. Craft the faces for this element.
+    int face_node_indices[8][6] = {{elem_nodes[0], elem_nodes[1], elem_nodes[2], elem_nodes[3]}, // -z
+                                   {elem_nodes[4], elem_nodes[5], elem_nodes[6], elem_nodes[7]}, // +z
+                                   {elem_nodes[0], elem_nodes[1], elem_nodes[5], elem_nodes[4]}, // -x
+                                   {elem_nodes[2], elem_nodes[3], elem_nodes[7], elem_nodes[6]}, // +x
+                                   {elem_nodes[1], elem_nodes[2], elem_nodes[6], elem_nodes[5]}, // -y
+                                   {elem_nodes[3], elem_nodes[0], elem_nodes[4], elem_nodes[7]}}; // +y
+    for (int f = 0; f < 6; ++f)
+    {
+      // Get the index of the face.
+      int face_index = map_nodes_to_face(node_face_map, face_node_indices[f], 4);
+
+      // Record the cell->face connectivity.
+      cell_faces[f] = face_index;
+
+      // Record the face->node connectivity.
+      int_array_append(face_node_offsets, 4);
+      int_array_append(face_nodes, face_node_indices[f][0]);
+      int_array_append(face_nodes, face_node_indices[f][1]);
+      int_array_append(face_nodes, face_node_indices[f][2]);
+      int_array_append(face_nodes, face_node_indices[f][3]);
+    }
+  }
+}
+
 mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
 {
   // Feel out the faces for the finite element mesh. Do we need to create 
   // them ourselves, or are they already all there?
   int num_cells = fe_mesh_num_elements(fe_mesh);
   int num_faces = fe_mesh_num_faces(fe_mesh);
-  int* cell_face_offsets = NULL;
+  int* cell_face_offsets = polymec_malloc(sizeof(int) * (num_cells + 1));
+  cell_face_offsets[0] = 0;
   int* cell_faces = NULL;
   int* face_node_offsets = NULL;
   int* face_nodes = NULL;
@@ -623,7 +835,7 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
     // This is a nodal finite element mesh, so we need to assemble the faces ourselves.
     polymec_not_implemented("nodal finite element mesh conversion");
 
-    // Traverse the element blocks and create faces.
+    // Traverse the element blocks and figure out the number of faces per cell.
     int pos = 0, elem_offset = 0;
     char* block_name;
     fe_block_t* block;
@@ -631,17 +843,48 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
     {
       int num_block_elem = fe_block_num_elements(block);
       fe_mesh_element_t elem_type = fe_block_element_type(block);
-
+      int num_elem_faces = get_num_cell_faces(elem_type);
+      for (int i = 0; i < num_block_elem; ++i)
+        cell_face_offsets[elem_offset+i] = cell_face_offsets[elem_offset+i-1] + num_elem_faces;
       elem_offset += num_block_elem;
     }
 
-    // Now identify the nodes for each face.
+    // Now assemble the faces for each cell.
+    int_tuple_int_unordered_map_t* node_face_map = int_tuple_int_unordered_map_new();
+    cell_faces = polymec_malloc(sizeof(int) * cell_face_offsets[num_cells]);
+
+    // We build the face->node connectivity data on-the-fly.
+    int_array_t* face_node_offsets_array = int_array_new();
+    int_array_t* face_nodes_array = int_array_new();
+
+    pos = 0, elem_offset = 0;
+    while (fe_mesh_next_block(fe_mesh, &pos, &block_name, &block))
+    {
+      int num_block_elem = fe_block_num_elements(block);
+      fe_mesh_element_t elem_type = fe_block_element_type(block);
+      int num_elem_nodes = fe_block_num_element_nodes(block, 0);
+      int elem_nodes[num_elem_nodes];
+      for (int i = 0; i < num_block_elem; ++i)
+      {
+        fe_block_get_element_nodes(block, i, elem_nodes);
+        int offset = cell_face_offsets[elem_offset+i];
+        get_cell_faces(elem_type, elem_nodes, node_face_map, 
+                       &cell_faces[offset], face_node_offsets_array,
+                       face_nodes_array);
+      }
+      elem_offset += num_block_elem;
+    }
+    int_tuple_int_unordered_map_free(node_face_map);
+
+    // Gift the contents of the arrays to our pointers.
+    face_node_offsets = face_node_offsets_array->data;
+    int_array_release_data_and_free(face_node_offsets_array);
+    face_nodes = face_nodes_array->data;
+    int_array_release_data_and_free(face_nodes_array);
   }
   else
   {
     // Fill in these arrays block by block.
-    cell_face_offsets = polymec_malloc(sizeof(int) * (num_cells + 1));
-    cell_face_offsets[0] = 0;
     int pos = 0;
     char* block_name;
     fe_block_t* block;
@@ -667,11 +910,12 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
     face_node_offsets = fe_mesh->face_node_offsets;
     face_nodes = fe_mesh->face_nodes;
   }
-  ASSERT(cell_face_offsets != NULL);
   ASSERT(cell_faces != NULL);
   ASSERT(face_node_offsets != NULL);
   ASSERT(face_nodes != NULL);
 
+  // Create the finite volume mesh and set up its cell->face and face->node 
+  // connectivity.
   int num_ghost_cells = 0; // FIXME!
   mesh_t* mesh = mesh_new(fe_mesh_comm(fe_mesh), 
                           num_cells, num_ghost_cells, 
@@ -726,6 +970,10 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
 
   return mesh;
 }
+
+//------------------------------------------------------------------------
+//              Finite Volume -> Finite Element Mesh Translation
+//------------------------------------------------------------------------
 
 fe_mesh_t* fe_mesh_from_mesh(mesh_t* fv_mesh,
                              string_array_t* element_block_tags)
