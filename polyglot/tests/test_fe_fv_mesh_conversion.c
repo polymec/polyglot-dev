@@ -10,6 +10,7 @@
 #include <setjmp.h>
 #include <string.h>
 #include "cmockery.h"
+#include "geometry/create_uniform_mesh.h"
 #include "polyglot/exodus_file.h"
 
 void test_mesh_from_fe_mesh(void** state)
@@ -27,12 +28,28 @@ void test_mesh_from_fe_mesh(void** state)
   mesh_free(fv_mesh);
 }
 
+void test_fe_mesh_from_mesh(void** state)
+{
+  bbox_t bbox = {.x1 = 0.0, .x2 = 1.0,
+                 .y1 = 0.0, .y2 = 1.0,
+                 .z1 = 0.0, .z2 = 1.0};
+  mesh_t* fv_mesh = create_uniform_mesh(MPI_COMM_SELF, 10, 10, 10, &bbox);
+  fe_mesh_t* fe_mesh = fe_mesh_from_mesh(fv_mesh, NULL);
+  mesh_free(fv_mesh);
+  assert_int_equal(1000, fe_mesh_num_elements(fe_mesh));
+  assert_int_equal(1, fe_mesh_num_blocks(fe_mesh));
+  assert_int_equal(1331, fe_mesh_num_nodes(fe_mesh));
+  assert_int_equal(3300, fe_mesh_num_faces(fe_mesh));
+  fe_mesh_free(fe_mesh);
+}
+
 int main(int argc, char* argv[]) 
 {
   polymec_init(argc, argv);
   const UnitTest tests[] = 
   {
-    unit_test(test_mesh_from_fe_mesh)
+    unit_test(test_mesh_from_fe_mesh),
+    unit_test(test_fe_mesh_from_mesh)
   };
   return run_tests(tests);
 }

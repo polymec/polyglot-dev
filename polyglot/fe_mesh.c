@@ -276,8 +276,19 @@ void fe_mesh_add_block(fe_mesh_t* mesh,
 {
   ptr_array_append_with_dtor(mesh->blocks, block, DTOR(fe_block_free));
   string_array_append_with_dtor(mesh->block_names, string_dup(name), string_free);
-  int num_elements = mesh->block_elem_offsets->data[mesh->block_elem_offsets->size-1] + fe_block_num_elements(block);
+  int num_block_elements = fe_block_num_elements(block);
+  int num_elements = mesh->block_elem_offsets->data[mesh->block_elem_offsets->size-1] + num_block_elements;
   int_array_append(mesh->block_elem_offsets, num_elements);
+
+  // If we are adding a polyhedral block, read off the maximum face and use 
+  // that to infer the number of faces in the mesh.
+  if (block->elem_faces != NULL)
+  {
+    int max_face = mesh->num_faces - 1;
+    for (int i = 0; i < block->elem_face_offsets[num_block_elements]; ++i)
+      max_face = MAX(max_face, block->elem_faces[i]);
+    mesh->num_faces = max_face + 1;
+  }
 }
 
 int fe_mesh_num_blocks(fe_mesh_t* mesh)
