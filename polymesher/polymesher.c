@@ -10,6 +10,7 @@
 #include "core/options.h"
 #include "core/interpreter.h"
 #include "geometry/interpreter_register_geometry_functions.h"
+#include "polyglot/interpreter_register_polyglot_functions.h"
 
 static void mesher_usage(FILE* stream)
 {
@@ -127,6 +128,7 @@ int main(int argc, char** argv)
     // Set up an interpreter for parsing the input file.
     interp = interpreter_new(NULL);
     interpreter_register_geometry_functions(interp);
+    interpreter_register_polyglot_functions(interp);
     interpreter_register_mesher_functions(interp);
 
     // If we were asked for help, service the request here.
