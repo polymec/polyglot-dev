@@ -17,3 +17,7 @@ add_test(NAME generate_exodus_data
 # Exodus tests.
 add_polyglot_test(test_exodus_file test_exodus_file.c)
 set_tests_properties(test_exodus_file PROPERTIES DEPENDS generate_exodus_data)
+
+# FE <--> FV mesh conversion.
+add_polyglot_test(test_fe_fv_mesh_conversion test_fe_fv_mesh_conversion.c)
+set_tests_properties(test_fe_fv_mesh_conversion PROPERTIES DEPENDS test_exodus_file)

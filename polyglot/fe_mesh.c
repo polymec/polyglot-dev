@@ -657,7 +657,9 @@ static bool tuples_are_equivalent(int* t1, int* t2)
 
 static int map_nodes_to_face(int_tuple_int_unordered_map_t* node_face_map,
                              int* nodes,
-                             int num_nodes)
+                             int num_nodes,
+                             int_array_t* face_node_offsets,
+                             int_array_t* face_nodes)
 {
   // Sort the nodes and see if they appear in the node face map.
   int* sorted_nodes = int_tuple_new(num_nodes);
@@ -667,14 +669,22 @@ static int map_nodes_to_face(int_tuple_int_unordered_map_t* node_face_map,
   int face_index;
   if (entry == NULL)
   {
+    // Add a new face!
     face_index = node_face_map->size;
     int_tuple_int_unordered_map_insert_with_k_dtor(node_face_map, sorted_nodes, face_index, int_tuple_free);
+
+    // Record the face->node connectivity.
+    int last_offset = face_node_offsets->data[face_node_offsets->size-1];
+    int_array_append(face_node_offsets, last_offset + num_nodes);
+    for (int n = 0; n < num_nodes; ++n)
+      int_array_append(face_nodes, nodes[n]);
   }
   else
   {
     face_index = *entry;
     int_tuple_free(sorted_nodes);
   }
+
   return face_index;
 }
 
@@ -697,16 +707,11 @@ static void get_cell_faces(fe_mesh_element_t elem_type,
     for (int f = 0; f < 4; ++f)
     {
       // Get the index of the face.
-      int face_index = map_nodes_to_face(node_face_map, face_node_indices[f], 3);
+      int face_index = map_nodes_to_face(node_face_map, face_node_indices[f], 3,
+                                         face_node_offsets, face_nodes);
 
       // Record the cell->face connectivity.
       cell_faces[f] = face_index;
-
-      // Record the face->node connectivity.
-      int_array_append(face_node_offsets, 3);
-      int_array_append(face_nodes, face_node_indices[f][0]);
-      int_array_append(face_nodes, face_node_indices[f][1]);
-      int_array_append(face_nodes, face_node_indices[f][2]);
     }
   }
   else if (elem_type == FE_PYRAMID)
@@ -720,33 +725,22 @@ static void get_cell_faces(fe_mesh_element_t elem_type,
     // Base face.
     {
       // Get the index of the face.
-      int face_index = map_nodes_to_face(node_face_map, base_face_nodes, 4);
+      int face_index = map_nodes_to_face(node_face_map, base_face_nodes, 4,
+                                         face_node_offsets, face_nodes);
 
       // Record the cell->face connectivity.
       cell_faces[0] = face_index;
-
-      // Record the face->node connectivity.
-      int_array_append(face_node_offsets, 4);
-      int_array_append(face_nodes, base_face_nodes[0]);
-      int_array_append(face_nodes, base_face_nodes[1]);
-      int_array_append(face_nodes, base_face_nodes[2]);
-      int_array_append(face_nodes, base_face_nodes[3]);
     }
 
     // Side faces.
     for (int f = 0; f < 4; ++f)
     {
       // Get the index of the face.
-      int face_index = map_nodes_to_face(node_face_map, side_face_nodes[f], 3);
+      int face_index = map_nodes_to_face(node_face_map, side_face_nodes[f], 3,
+                                         face_node_offsets, face_nodes);
 
       // Record the cell->face connectivity.
       cell_faces[1+f] = face_index;
-
-      // Record the face->node connectivity.
-      int_array_append(face_node_offsets, 3);
-      int_array_append(face_nodes, side_face_nodes[f][0]);
-      int_array_append(face_nodes, side_face_nodes[f][1]);
-      int_array_append(face_nodes, side_face_nodes[f][2]);
     }
   }
   else if (elem_type == FE_WEDGE)
@@ -761,33 +755,22 @@ static void get_cell_faces(fe_mesh_element_t elem_type,
     for (int f = 0; f < 2; ++f)
     {
       // Get the index of the face.
-      int face_index = map_nodes_to_face(node_face_map, base_face_nodes[f], 3);
+      int face_index = map_nodes_to_face(node_face_map, base_face_nodes[f], 3,
+                                         face_node_offsets, face_nodes);
 
       // Record the cell->face connectivity.
       cell_faces[f] = face_index;
-
-      // Record the face->node connectivity.
-      int_array_append(face_node_offsets, 3);
-      int_array_append(face_nodes, base_face_nodes[f][0]);
-      int_array_append(face_nodes, base_face_nodes[f][1]);
-      int_array_append(face_nodes, base_face_nodes[f][2]);
     }
 
     // Side faces.
     for (int f = 0; f < 3; ++f)
     {
       // Get the index of the face.
-      int face_index = map_nodes_to_face(node_face_map, side_face_nodes[f], 4);
+      int face_index = map_nodes_to_face(node_face_map, side_face_nodes[f], 4,
+                                         face_node_offsets, face_nodes);
 
       // Record the cell->face connectivity.
       cell_faces[2+f] = face_index;
-
-      // Record the face->node connectivity.
-      int_array_append(face_node_offsets, 4);
-      int_array_append(face_nodes, side_face_nodes[f][0]);
-      int_array_append(face_nodes, side_face_nodes[f][1]);
-      int_array_append(face_nodes, side_face_nodes[f][2]);
-      int_array_append(face_nodes, side_face_nodes[f][3]);
     }
   }
   else 
@@ -804,17 +787,11 @@ static void get_cell_faces(fe_mesh_element_t elem_type,
     for (int f = 0; f < 6; ++f)
     {
       // Get the index of the face.
-      int face_index = map_nodes_to_face(node_face_map, face_node_indices[f], 4);
+      int face_index = map_nodes_to_face(node_face_map, face_node_indices[f], 4,
+                                         face_node_offsets, face_nodes);
 
       // Record the cell->face connectivity.
       cell_faces[f] = face_index;
-
-      // Record the face->node connectivity.
-      int_array_append(face_node_offsets, 4);
-      int_array_append(face_nodes, face_node_indices[f][0]);
-      int_array_append(face_nodes, face_node_indices[f][1]);
-      int_array_append(face_nodes, face_node_indices[f][2]);
-      int_array_append(face_nodes, face_node_indices[f][3]);
     }
   }
 }
@@ -832,9 +809,6 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
   int* face_nodes = NULL;
   if (num_faces == 0)
   {
-    // This is a nodal finite element mesh, so we need to assemble the faces ourselves.
-    polymec_not_implemented("nodal finite element mesh conversion");
-
     // Traverse the element blocks and figure out the number of faces per cell.
     int pos = 0, elem_offset = 0;
     char* block_name;
@@ -845,7 +819,7 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
       fe_mesh_element_t elem_type = fe_block_element_type(block);
       int num_elem_faces = get_num_cell_faces(elem_type);
       for (int i = 0; i < num_block_elem; ++i)
-        cell_face_offsets[elem_offset+i] = cell_face_offsets[elem_offset+i-1] + num_elem_faces;
+        cell_face_offsets[elem_offset+i+1] = cell_face_offsets[elem_offset+i] + num_elem_faces;
       elem_offset += num_block_elem;
     }
 
@@ -855,6 +829,7 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
 
     // We build the face->node connectivity data on-the-fly.
     int_array_t* face_node_offsets_array = int_array_new();
+    int_array_append(face_node_offsets_array, 0);
     int_array_t* face_nodes_array = int_array_new();
 
     pos = 0, elem_offset = 0;
@@ -874,6 +849,9 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
       }
       elem_offset += num_block_elem;
     }
+
+    // Record the total number of faces and discard the map.
+    num_faces = node_face_map->size;
     int_tuple_int_unordered_map_free(node_face_map);
 
     // Gift the contents of the arrays to our pointers.
@@ -919,7 +897,7 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
   int num_ghost_cells = 0; // FIXME!
   mesh_t* mesh = mesh_new(fe_mesh_comm(fe_mesh), 
                           num_cells, num_ghost_cells, 
-                          fe_mesh_num_faces(fe_mesh),
+                          num_faces,
                           fe_mesh_num_nodes(fe_mesh));
   memcpy(mesh->cell_face_offsets, cell_face_offsets, sizeof(int) * (mesh->num_cells+1));
   memcpy(mesh->face_node_offsets, face_node_offsets, sizeof(int) * (mesh->num_faces+1));
@@ -958,6 +936,33 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
 
   // Calculate geometry.
   mesh_compute_geometry(mesh);
+
+  // Sets -> tags.
+  int pos = 0, *set, set_size;
+  char* set_name;
+  while (fe_mesh_next_element_set(fe_mesh, &pos, &set_name, &set, &set_size))
+  {
+    int* tag = mesh_create_tag(mesh->cell_tags, set_name, set_size);
+    memcpy(tag, set, sizeof(int) * set_size);
+  }
+  pos = 0;
+  while (fe_mesh_next_face_set(fe_mesh, &pos, &set_name, &set, &set_size))
+  {
+    int* tag = mesh_create_tag(mesh->face_tags, set_name, set_size);
+    memcpy(tag, set, sizeof(int) * set_size);
+  }
+  pos = 0;
+  while (fe_mesh_next_edge_set(fe_mesh, &pos, &set_name, &set, &set_size))
+  {
+    int* tag = mesh_create_tag(mesh->edge_tags, set_name, set_size);
+    memcpy(tag, set, sizeof(int) * set_size);
+  }
+  pos = 0;
+  while (fe_mesh_next_node_set(fe_mesh, &pos, &set_name, &set, &set_size))
+  {
+    int* tag = mesh_create_tag(mesh->node_tags, set_name, set_size);
+    memcpy(tag, set, sizeof(int) * set_size);
+  }
 
   // Clean up.
   polymec_free(cell_face_offsets);
