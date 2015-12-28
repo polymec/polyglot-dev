@@ -18,105 +18,33 @@
 
 // This helper function converts the given element identifier string and number of nodes to 
 // our own element enumerated type.
-static fe_mesh_element_t get_element_type(const char* elem_type_id, int num_nodes_per_elem)
+static fe_mesh_element_t get_element_type(const char* elem_type_id)
 {
   if (string_ncasecmp(elem_type_id, "nfaced", 6) == 0)
-  {
-    ASSERT(num_nodes_per_elem == 0);
     return FE_POLYHEDRON;
-  }
   else if (string_ncasecmp(elem_type_id, "tetra", 5) == 0)
-  {
-    if (num_nodes_per_elem == 4)
-      return FE_TETRAHEDRON_4;
-    else if (num_nodes_per_elem == 8)
-      return FE_TETRAHEDRON_8;
-    else if (num_nodes_per_elem == 10)
-      return FE_TETRAHEDRON_10;
-    else 
-    {
-      ASSERT(num_nodes_per_elem == 14);
-      return FE_TETRAHEDRON_14;
-    }
-  }
+    return FE_TETRAHEDRON;
   else if (string_ncasecmp(elem_type_id, "pyramid", 7) == 0)
-  {
-    if (num_nodes_per_elem == 5)
-      return FE_PYRAMID_5;
-    else 
-    {
-      ASSERT(num_nodes_per_elem == 13);
-      return FE_PYRAMID_13;
-    }
-  }
+    return FE_PYRAMID;
   else if (string_ncasecmp(elem_type_id, "wedge", 5) == 0)
-  {
-    if (num_nodes_per_elem == 6)
-      return FE_WEDGE_6;
-    else if (num_nodes_per_elem == 15)
-      return FE_WEDGE_15;
-    else 
-    {
-      ASSERT(num_nodes_per_elem == 16);
-      return FE_WEDGE_15;
-    }
-  }
+    return FE_WEDGE;
   else if (string_ncasecmp(elem_type_id, "hex", 3) == 0)
-  {
-    if (num_nodes_per_elem == 8)
-      return FE_HEXAHEDRON_8;
-    else if (num_nodes_per_elem == 9)
-      return FE_HEXAHEDRON_9;
-    else if (num_nodes_per_elem == 20)
-      return FE_HEXAHEDRON_20;
-    else 
-    {
-      ASSERT(num_nodes_per_elem == 27);
-      return FE_HEXAHEDRON_27;
-    }
-  }
+    return FE_HEXAHEDRON;
   else
     return FE_INVALID;
 }
 
-static void get_elem_info(fe_mesh_element_t elem_type,
-                          char* elem_type_name,
-                          int* num_elem_nodes)
+static void get_elem_name(fe_mesh_element_t elem_type,
+                          char* elem_type_name)
 {
   // Figure out the element type name.
   switch(elem_type)
   {
-    case FE_TETRAHEDRON_4: 
-    case FE_TETRAHEDRON_8:
-    case FE_TETRAHEDRON_10: 
-    case FE_TETRAHEDRON_14: strcpy(elem_type_name, "TETRA"); break;
-    case FE_PYRAMID_5: 
-    case FE_PYRAMID_13: strcpy(elem_type_name, "PYRAMID"); break;
-    case FE_WEDGE_6: 
-    case FE_WEDGE_15: strcpy(elem_type_name, "WEDGE"); break;
-    case FE_HEXAHEDRON_8: 
-    case FE_HEXAHEDRON_9: 
-    case FE_HEXAHEDRON_20:
-    case FE_HEXAHEDRON_27: strcpy(elem_type_name, "HEX"); break;
-    default: strcpy(elem_type_name, "UNKNOWN");
-  }
-
-  // Figure out the number of nodes.
-  switch(elem_type)
-  {
-    case FE_TETRAHEDRON_4: *num_elem_nodes = 4; break;
-    case FE_PYRAMID_5: *num_elem_nodes = 5; break;
-    case FE_WEDGE_6: *num_elem_nodes = 6; break;
-    case FE_TETRAHEDRON_8:
-    case FE_HEXAHEDRON_8: *num_elem_nodes = 8; break;
-    case FE_HEXAHEDRON_9: *num_elem_nodes = 9; break;
-    case FE_TETRAHEDRON_10: *num_elem_nodes = 10; break;
-    case FE_PYRAMID_13: *num_elem_nodes = 13; break;
-    case FE_TETRAHEDRON_14: *num_elem_nodes = 14; break;
-    case FE_WEDGE_15: *num_elem_nodes = 15; break;
-    case FE_HEXAHEDRON_20: *num_elem_nodes = 20; break;
-    case FE_HEXAHEDRON_27: *num_elem_nodes = 27; break;
-    default: *num_elem_nodes = -1;
+    case FE_TETRAHEDRON: strcpy(elem_type_name, "tetra"); break;
+    case FE_PYRAMID: strcpy(elem_type_name, "pyramid"); break;
+    case FE_WEDGE: strcpy(elem_type_name, "wedge"); break;
+    case FE_HEXAHEDRON: strcpy(elem_type_name, "hex"); break;
+    default: strcpy(elem_type_name, "unknown");
   }
 }
 
@@ -157,6 +85,9 @@ bool exodus_file_query(const char* filename,
                        int* num_mpi_processes,
                        real_array_t* times)
 {
+  if (!file_exists(filename))
+    return false;
+
   bool valid = true;
   bool is_parallel = false;
   int my_real_size = (int)sizeof(real_t);
@@ -195,21 +126,46 @@ bool exodus_file_query(const char* filename,
       valid = false;
     else
     {
-      // Query the number of processes for which this file has data.
-      int num_proc_in_file;
-      char file_type[2];
-      ex_get_init_info(id, num_mpi_processes, &num_proc_in_file, file_type);
-      if (is_parallel)
+      // Make sure that each of the element blocks in this file have 
+      // valid 3D element types.
+      int num_elem_blocks = mesh_info.num_elem_blk;
+      int elem_block_ids[num_elem_blocks];
+      ex_get_ids(id, EX_ELEM_BLOCK, elem_block_ids);
+      for (int i = 0; i < num_elem_blocks; ++i)
       {
-        ASSERT(*num_mpi_processes == num_proc_in_file);
+        int elem_block = elem_block_ids[i];
+        char elem_type_name[MAX_NAME_LENGTH+1];
+        int num_elem, num_nodes_per_elem, num_faces_per_elem;
+        ex_get_block(id, EX_ELEM_BLOCK, elem_block, 
+                     elem_type_name, &num_elem,
+                     &num_nodes_per_elem, NULL,
+                     &num_faces_per_elem, NULL);
+        fe_mesh_element_t elem_type = get_element_type(elem_type_name);
+        if (elem_type == FE_INVALID)
+        {
+          valid = false;
+          break;
+        }
       }
-
-      if (times != NULL)
+      
+      if (valid)
       {
-        // Ask for the times within the file.
-        int num_times = ex_inquire_int(id, EX_INQ_TIME);
-        real_array_resize(times, num_times);
-        ex_get_all_times(id, times->data);
+        // Query the number of processes for which this file has data.
+        int num_proc_in_file;
+        char file_type[2];
+        ex_get_init_info(id, num_mpi_processes, &num_proc_in_file, file_type);
+        if (is_parallel)
+        {
+          ASSERT(*num_mpi_processes == num_proc_in_file);
+        }
+
+        if (times != NULL)
+        {
+          // Ask for the times within the file.
+          int num_times = ex_inquire_int(id, EX_INQ_TIME);
+          real_array_resize(times, num_times);
+          ex_get_all_times(id, times->data);
+        }
       }
     }
 
@@ -453,21 +409,24 @@ static void write_set(exodus_file_t* file,
                       int* set,
                       int set_size)
 {
-  ex_put_name(file->ex_id, EX_ELEM_SET, (ex_entity_id)set_id, set_name);
   int num_dist_factors = 0;
-  ex_put_set_param(file->ex_id, EX_ELEM_SET, (ex_entity_id)set_id, set_size, num_dist_factors);
   if (set_type != EX_SIDE_SET)
-    ex_put_set(file->ex_id, EX_ELEM_SET, (ex_entity_id)set_id, set, NULL);
+  {
+    ex_put_set_param(file->ex_id, set_type, (ex_entity_id)set_id, set_size, num_dist_factors);
+    ex_put_set(file->ex_id, set_type, (ex_entity_id)set_id, set, NULL);
+  }
   else
   {
-    int elems[set_size], faces[set_size];
-    for (int i = 0; i < set_size; ++i)
+    ex_put_set_param(file->ex_id, set_type, (ex_entity_id)set_id, set_size/2, num_dist_factors);
+    int elems[set_size/2], faces[set_size/2];
+    for (int i = 0; i < set_size/2; ++i)
     {
       elems[i] = set[2*i];
       faces[i] = set[2*i+1];
     }
-    ex_put_set(file->ex_id, EX_ELEM_SET, (ex_entity_id)set_id, elems, faces);
+    ex_put_set(file->ex_id, set_type, (ex_entity_id)set_id, elems, faces);
   }
+  ex_put_name(file->ex_id, set_type, (ex_entity_id)set_id, set_name);
 }
 
 void exodus_file_write_mesh(exodus_file_t* file,
@@ -477,7 +436,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
 
   // Count up the number of polyhedral blocks.
   int num_blocks = fe_mesh_num_blocks(mesh);
-  int num_poly_blocks = 0;
+  bool is_polyhedral = false;
   int pos = 0;
   char* block_name;
   fe_block_t* block;
@@ -485,7 +444,10 @@ void exodus_file_write_mesh(exodus_file_t* file,
   {
     fe_mesh_element_t elem_type = fe_block_element_type(block);
     if (elem_type == FE_POLYHEDRON)
-      ++num_poly_blocks;
+    {
+      is_polyhedral = true;
+      break;
+    }
   }
 
   // Write out information about elements, faces, edges, nodes.
@@ -499,7 +461,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
   params.num_edge_blk = 0;
   int num_faces = fe_mesh_num_faces(mesh);
   params.num_face = num_faces;
-  params.num_face_blk = num_poly_blocks;
+  params.num_face_blk = (is_polyhedral) ? 1 : 0;
   int num_elem = fe_mesh_num_elements(mesh);
   params.num_elem = num_elem;
   params.num_elem_blk = num_blocks;
@@ -516,7 +478,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
 
   // If we have any polyhedral element blocks, we write out a single face 
   // block that incorporates all of the polyhedral elements.
-  if (num_poly_blocks > 0)
+  if (is_polyhedral)
   {
     int num_poly_faces = 0, tot_poly_face_nodes = 0;
     // FIXME
@@ -589,8 +551,8 @@ void exodus_file_write_mesh(exodus_file_t* file,
     {
       // Get element information.
       char elem_type_name[MAX_NAME_LENGTH+1];
-      int num_nodes_per_elem;
-      get_elem_info(elem_type, elem_type_name, &num_nodes_per_elem);
+      get_elem_name(elem_type, elem_type_name);
+      int num_nodes_per_elem = fe_block_num_element_nodes(block, 0);
 
       // Write the block.
       ex_put_block(file->ex_id, EX_ELEM_BLOCK, elem_block, elem_type_name, 
@@ -626,37 +588,37 @@ void exodus_file_write_mesh(exodus_file_t* file,
   ex_put_coord_names(file->ex_id, coord_names);
 
   // Write sets of entities.
-  int *set, set_size;
+  int *set, set_size, set_id = 0;
   char* set_name;
-  pos = 0;
+  pos = set_id = 0;
   while (fe_mesh_next_element_set(mesh, &pos, &set_name, &set, &set_size))
-    write_set(file, EX_ELEM_SET, pos, set_name, set, set_size);
-  pos = 0;
+    write_set(file, EX_ELEM_SET, ++set_id, set_name, set, set_size);
+  pos = set_id = 0;
   while (fe_mesh_next_face_set(mesh, &pos, &set_name, &set, &set_size))
-    write_set(file, EX_FACE_SET, pos, set_name, set, set_size);
-  pos = 0;
+    write_set(file, EX_FACE_SET, ++set_id, set_name, set, set_size);
+  pos = set_id = 0;
   while (fe_mesh_next_edge_set(mesh, &pos, &set_name, &set, &set_size))
-    write_set(file, EX_EDGE_SET, pos, set_name, set, set_size);
-  pos = 0;
+    write_set(file, EX_EDGE_SET, ++set_id, set_name, set, set_size);
+  pos = set_id = 0;
   while (fe_mesh_next_node_set(mesh, &pos, &set_name, &set, &set_size))
-    write_set(file, EX_NODE_SET, pos, set_name, set, set_size);
-  pos = 0;
+    write_set(file, EX_NODE_SET, ++set_id, set_name, set, set_size);
+  pos = set_id = 0;
   while (fe_mesh_next_side_set(mesh, &pos, &set_name, &set, &set_size))
-    write_set(file, EX_SIDE_SET, pos, set_name, set, set_size);
+    write_set(file, EX_SIDE_SET, ++set_id, set_name, set, set_size);
 }
 
 static void fetch_set(exodus_file_t* file, 
                       ex_entity_type set_type,
-                      ex_entity_id set_id,
+                      int set_id,
                       fe_mesh_t* mesh,
                       int* (*create_set)(fe_mesh_t* mesh, const char* name, int))
 {
   char set_name[MAX_NAME_LENGTH+1];
-  ex_get_name(file->ex_id, EX_ELEM_SET, set_id, set_name);
+  ex_get_name(file->ex_id, set_type, (ex_entity_id)set_id, set_name);
   int set_size, num_dist_factors;
-  ex_get_set_param(file->ex_id, EX_ELEM_SET, set_id, &set_size, &num_dist_factors);
+  ex_get_set_param(file->ex_id, set_type, (ex_entity_id)set_id, &set_size, &num_dist_factors);
   int* set = create_set(mesh, set_name, set_size);
-  ex_get_set(file->ex_id, EX_ELEM_SET, set_id, set, NULL);
+  ex_get_set(file->ex_id, set_type, (ex_entity_id)set_id, set, NULL);
 }
 
 fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
@@ -675,7 +637,7 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
                  elem_type_name, &num_elem,
                  &num_nodes_per_elem, NULL,
                  &num_faces_per_elem, NULL);
-    fe_mesh_element_t elem_type = get_element_type(elem_type_name, num_nodes_per_elem);
+    fe_mesh_element_t elem_type = get_element_type(elem_type_name);
     if (elem_type == FE_POLYHEDRON)
       ++num_poly_blocks;
   }
@@ -728,7 +690,7 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
                  &num_faces_per_elem, NULL);
 
     // Get the type of element for this block.
-    fe_mesh_element_t elem_type = get_element_type(elem_type_name, num_nodes_per_elem);
+    fe_mesh_element_t elem_type = get_element_type(elem_type_name);
     fe_block_t* block = NULL;
     char block_name[MAX_NAME_LENGTH+1];
     if (elem_type == FE_POLYHEDRON)
@@ -763,7 +725,7 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
         node_conn[i] -= 1;
 
       // Build the element block.
-      block = fe_block_new(num_elem, elem_type, node_conn);
+      block = fe_block_new(num_elem, elem_type, num_nodes_per_elem, node_conn);
     }
     else
     {
@@ -800,7 +762,7 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
   for (int i = 1; i <= file->num_edge_sets; ++i)
     fetch_set(file, EX_EDGE_SET, i, mesh, fe_mesh_create_edge_set);
   for (int i = 1; i <= file->num_node_sets; ++i)
-    fetch_set(file, EX_NODE_SET, i, mesh, fe_mesh_create_edge_set);
+    fetch_set(file, EX_NODE_SET, i, mesh, fe_mesh_create_node_set);
   for (int i = 1; i <= file->num_side_sets; ++i)
     fetch_set(file, EX_SIDE_SET, i, mesh, fe_mesh_create_side_set);
 

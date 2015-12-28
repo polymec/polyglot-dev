@@ -16,19 +16,10 @@
 typedef enum
 {
   FE_INVALID,
-  FE_TETRAHEDRON_4, 
-  FE_TETRAHEDRON_8, 
-  FE_TETRAHEDRON_10, 
-  FE_TETRAHEDRON_14,
-  FE_PYRAMID_5,
-  FE_PYRAMID_13,
-  FE_WEDGE_6, 
-  FE_WEDGE_15,
-  FE_WEDGE_16,
-  FE_HEXAHEDRON_8,
-  FE_HEXAHEDRON_9,
-  FE_HEXAHEDRON_20,
-  FE_HEXAHEDRON_27,
+  FE_TETRAHEDRON, 
+  FE_PYRAMID,
+  FE_WEDGE, 
+  FE_HEXAHEDRON,
   FE_POLYHEDRON
 } fe_mesh_element_t;
 
@@ -45,6 +36,7 @@ typedef struct fe_block_t fe_block_t;
 // number of nodes per element is defined by the element type.
 fe_block_t* fe_block_new(int num_elem,
                          fe_mesh_element_t type,
+                         int num_elem_nodes,
                          int* elem_node_indices);
 
 // Constructs a new finite element block of polyhedra

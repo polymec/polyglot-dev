@@ -25,28 +25,9 @@ struct fe_block_t
   int* elem_edges;
 };
 
-static int get_num_elem_nodes(fe_mesh_element_t elem_type)
-{
-  switch(elem_type)
-  {
-    case FE_TETRAHEDRON_4: return 4;
-    case FE_PYRAMID_5: return 5;
-    case FE_WEDGE_6: return 6;
-    case FE_TETRAHEDRON_8:
-    case FE_HEXAHEDRON_8: return 8;
-    case FE_HEXAHEDRON_9: return 9;
-    case FE_TETRAHEDRON_10: return 10;
-    case FE_PYRAMID_13: return 13;
-    case FE_TETRAHEDRON_14: return 14;
-    case FE_WEDGE_15: return 15;
-    case FE_HEXAHEDRON_20: return 20;
-    case FE_HEXAHEDRON_27: return 27;
-    default: return -1;
-  }
-}
-
 fe_block_t* fe_block_new(int num_elem,
                          fe_mesh_element_t type,
+                         int num_elem_nodes,
                          int* elem_node_indices)
 {
   ASSERT(num_elem > 0);
@@ -56,7 +37,6 @@ fe_block_t* fe_block_new(int num_elem,
   block->elem_type = type;
 
   // Element nodes.
-  int num_elem_nodes = get_num_elem_nodes(type);
   block->elem_node_offsets = polymec_malloc(sizeof(int) * num_elem_nodes * num_elem);
   block->elem_node_offsets[0] = 0;
   for (int i = 0; i < num_elem; ++i)
@@ -278,7 +258,7 @@ fe_mesh_t* fe_mesh_clone(fe_mesh_t* mesh)
     copy->block_names->data[i] = string_dup(mesh->block_names->data[i]);
   copy->block_elem_offsets = int_array_new();
   for (int i = 0; i < mesh->block_elem_offsets->size; ++i)
-    copy->block_elem_offsets->data[i] = mesh->block_elem_offsets->data[i];
+    int_array_append(copy->block_elem_offsets, mesh->block_elem_offsets->data[i]);
   copy->node_coords = polymec_malloc(sizeof(point_t) * copy->num_nodes);
   memcpy(copy->node_coords, mesh->node_coords, sizeof(point_t) * copy->num_nodes);
   return copy;
@@ -295,7 +275,7 @@ void fe_mesh_add_block(fe_mesh_t* mesh,
 {
   ptr_array_append_with_dtor(mesh->blocks, block, DTOR(fe_block_free));
   string_array_append_with_dtor(mesh->block_names, string_dup(name), string_free);
-  int num_elements = mesh->block_elem_offsets->data[mesh->block_elem_offsets->size] + fe_block_num_elements(block);
+  int num_elements = mesh->block_elem_offsets->data[mesh->block_elem_offsets->size-1] + fe_block_num_elements(block);
   int_array_append(mesh->block_elem_offsets, num_elements);
 }
 
@@ -330,10 +310,10 @@ int fe_mesh_num_element_nodes(fe_mesh_t* mesh, int elem_index)
 
   // Find the block that houses this element.
   int b = 0;
-  if (mesh->block_elem_offsets->size == 2)
+  if (mesh->blocks->size > 1)
   {
-    while (((b+1) < mesh->block_elem_offsets->size) && 
-           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
+           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
     if (b == mesh->block_elem_offsets->size-1)
       return -1;
   }
@@ -350,10 +330,10 @@ void fe_mesh_get_element_nodes(fe_mesh_t* mesh,
 {
   // Find the block that houses this element.
   int b = 0;
-  if (mesh->block_elem_offsets->size == 2)
+  if (mesh->blocks->size > 1)
   {
-    while (((b+1) < mesh->block_elem_offsets->size) && 
-           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
+           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
     if (b == mesh->block_elem_offsets->size-1)
       return;
   }
@@ -368,10 +348,10 @@ int fe_mesh_num_element_faces(fe_mesh_t* mesh, int elem_index)
 {
   // Find the block that houses this element.
   int b = 0;
-  if (mesh->block_elem_offsets->size == 2)
+  if (mesh->blocks->size > 1)
   {
-    while (((b+1) < mesh->block_elem_offsets->size) && 
-           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
+           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
     if (b == mesh->block_elem_offsets->size-1)
       return -1;
   }
@@ -388,10 +368,10 @@ void fe_mesh_get_element_faces(fe_mesh_t* mesh,
 {
   // Find the block that houses this element.
   int b = 0;
-  if (mesh->block_elem_offsets->size == 2)
+  if (mesh->blocks->size > 1)
   {
-    while (((b+1) < mesh->block_elem_offsets->size) && 
-           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
+           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
     if (b == mesh->block_elem_offsets->size-1)
       return;
   }
@@ -406,10 +386,10 @@ int fe_mesh_num_element_edges(fe_mesh_t* mesh, int elem_index)
 {
   // Find the block that houses this element.
   int b = 0;
-  if (mesh->block_elem_offsets->size == 2)
+  if (mesh->blocks->size > 1)
   {
-    while (((b+1) < mesh->block_elem_offsets->size) && 
-           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
+           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
     if (b == mesh->block_elem_offsets->size-1)
       return -1;
   }
@@ -426,10 +406,10 @@ void fe_mesh_get_element_edges(fe_mesh_t* mesh,
 {
   // Find the block that houses this element.
   int b = 0;
-  if (mesh->block_elem_offsets->size == 2)
+  if (mesh->blocks->size > 1)
   {
-    while (((b+1) < mesh->block_elem_offsets->size) && 
-           (mesh->block_elem_offsets->data[b+1] < elem_index)) ++b;
+    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
+           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
     if (b == mesh->block_elem_offsets->size-1)
       return;
   }
