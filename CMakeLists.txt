@@ -46,6 +46,7 @@ include_directories(${PROJECT_BINARY_DIR})
 include_directories(${PROJECT_BINARY_DIR}/include)
 
 # Look for libraries in these directories.
+link_directories("${PROJECT_BINARY_DIR}/lib")
 link_directories("${POLYMEC_PREFIX}/lib")
 
 enable_testing()
