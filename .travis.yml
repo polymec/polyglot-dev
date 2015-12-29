@@ -23,7 +23,7 @@ addons:
       - gcc
       - clang
       - libopenmpi-dev
-      - gfortran
+      - libopenmpi-bin
       - wget
 
 deploy:
