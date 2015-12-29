@@ -51,9 +51,9 @@ static void get_elem_name(fe_mesh_element_t elem_type,
 struct exodus_file_t 
 {
   char title[MAX_NAME_LENGTH+1];
+  MPI_Comm comm;        // Parallel communicator.
 
 #if POLYMEC_HAVE_MPI
-  MPI_Comm comm;        // Parallel communicator.
   MPI_Info mpi_info;    // Parallel info returned by NetCDF.
 #endif
 
