@@ -16,6 +16,21 @@
 
 #include "exodusII.h"
 
+// This flag is set to true when logging options are set for the Exodus library.
+static bool ex_opts_set = false;
+
+static void set_ex_opts()
+{
+  if (!ex_opts_set)
+  {
+    if (log_level() == LOG_DEBUG)
+      ex_opts(EX_DEBUG | EX_VERBOSE);
+    else if (log_level() == LOG_DETAIL)
+      ex_opts(EX_VERBOSE);
+    ex_opts_set = true;
+  }
+}
+
 // This helper function converts the given element identifier string and number of nodes to 
 // our own element enumerated type.
 static fe_mesh_element_t get_element_type(const char* elem_type_id)
@@ -85,6 +100,8 @@ bool exodus_file_query(const char* filename,
                        int* num_mpi_processes,
                        real_array_t* times)
 {
+  set_ex_opts();
+
   if (!file_exists(filename))
     return false;
 
@@ -219,6 +236,8 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
                                        const char* filename,
                                        int mode)
 {
+  set_ex_opts();
+
   exodus_file_t* file = polymec_malloc(sizeof(exodus_file_t));
   file->last_time_index = 0;
   file->comm = comm;
