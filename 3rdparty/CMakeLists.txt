@@ -116,14 +116,6 @@ if (POLYMEC_HAVE_MPI)
   set(POLYGLOT_TP_LIBS exodus_par;${POLYGLOT_TP_LIBS})
 endif()
 
-# Build the Lemon parser generator, which we use to generate parsers for 
-# certain troublesome input formats. See the documentation at 
-# http://www.hwaci.com/sw/lemon/lemon.html
-# and the tutorial at 
-# http://souptonuts.sourceforge.net/readme_lemon_tutorial.html
-# for details on usage.
-#add_executable(lemon lemon.c)
-
 # Add all the libraries to the build system at large.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${POLYGLOT_TP_C_FLAGS}" PARENT_SCOPE)
 set(POLYGLOT_LIBRARIES ${POLYGLOT_TP_LIBS};${POLYGLOT_LIBRARIES} PARENT_SCOPE)
