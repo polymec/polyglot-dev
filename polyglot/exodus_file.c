@@ -364,7 +364,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
 exodus_file_t* exodus_file_new(MPI_Comm comm,
                                const char* filename)
 {
-  return open_exodus_file(comm, filename, EX_CLOBBER | EX_NETCDF4);
+  return open_exodus_file(comm, filename, EX_WRITE | EX_CLOBBER | EX_NETCDF4);
 }
 
 exodus_file_t* exodus_file_open(MPI_Comm comm,
