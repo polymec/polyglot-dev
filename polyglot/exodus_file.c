@@ -334,6 +334,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
   }
   else
   {
+    log_debug("open_exodus_file: ex_open returned %d", file->ex_id);
     polymec_free(file);
     file = NULL;
   }
