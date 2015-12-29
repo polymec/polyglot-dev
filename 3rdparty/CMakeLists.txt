@@ -16,6 +16,7 @@ if (NOT EXISTS ${NETCDF_LIBRARY})
                   OUTPUT_VARIABLE netcdf_config_log ERROR_VARIABLE netcdf_config_err
                   RESULT_VARIABLE stat)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/netcdf_config.log ${netcdf_config_log})
+  message(${netcdf_config_log})
   if (NOT stat EQUAL 0)
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/netcdf_config_errors.log ${netcdf_config_err})
     message(FATAL_ERROR "Error configuring netcdf library. See ${CMAKE_CURRENT_BINARY_DIR}/netcdf_config*.log for details.")
