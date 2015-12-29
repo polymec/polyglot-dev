@@ -43,7 +43,6 @@ after_success:
   - mv polyglot-$CC-debug=$DEBUG-mpi=$MPI.tar.gz latest
 
 script: 
-  - pushd $HOME && wget https://s3-us-west-2.amazonaws.com/polymec-dev.travis-ci/polymec-dev/polymec-$CC-debug%3D$DEBUG-mpi%3D$MPI.tar.gz && popd
-  - pushd $HOME && tar xzvf polymec-$CC-debug=$DEBUG-mpi=$MPI.tar.gz && popd
-  - make config polymec="$PWD/polymec-$CC-debug=$DEBUG-mpi=$MPI" && make -j4 install
+  - pushd $HOME && wget https://s3-us-west-2.amazonaws.com/polymec-dev.travis-ci/polymec-dev/polymec-$CC-debug%3D$DEBUG-mpi%3D$MPI.tar.gz && tar xzvf polymec-$CC-debug=$DEBUG-mpi=$MPI.tar.gz && popd
+  - make config polymec="$HOME/polymec-$CC-debug=$DEBUG-mpi=$MPI" && make -j4 install
 
