@@ -183,7 +183,10 @@ bool exodus_file_query(const char* filename,
           // Ask for the times within the file.
           int num_times = ex_inquire_int(id, EX_INQ_TIME);
           real_array_resize(times, num_times);
-          ex_get_all_times(id, times->data);
+          if (num_times > 0)
+          {
+            ex_get_all_times(id, times->data);
+          }
         }
       }
     }
