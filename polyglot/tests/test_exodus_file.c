@@ -289,6 +289,7 @@ void test_write_poly_exodus_file(void** state)
 int main(int argc, char* argv[]) 
 {
   polymec_init(argc, argv);
+  set_log_level(LOG_DEBUG);
   const UnitTest tests[] = 
   {
     unit_test(test_exodus_file_query),

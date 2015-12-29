@@ -14,7 +14,24 @@
 #include "exodusII_par.h"
 #endif 
 
+#include "netcdf.h"
 #include "exodusII.h"
+#include "exodusII_int.h"
+
+// This flag is set to true when logging options are set for the Exodus library.
+static bool ex_opts_set = false;
+
+static void set_ex_opts()
+{
+  if (!ex_opts_set)
+  {
+    if (log_level() == LOG_DEBUG)
+      ex_opts(EX_DEBUG | EX_VERBOSE);
+    else if (log_level() == LOG_DETAIL)
+      ex_opts(EX_VERBOSE);
+    ex_opts_set = true;
+  }
+}
 
 // This helper function converts the given element identifier string and number of nodes to 
 // our own element enumerated type.
@@ -85,6 +102,8 @@ bool exodus_file_query(const char* filename,
                        int* num_mpi_processes,
                        real_array_t* times)
 {
+  set_ex_opts();
+
   if (!file_exists(filename))
     return false;
 
@@ -164,7 +183,10 @@ bool exodus_file_query(const char* filename,
           // Ask for the times within the file.
           int num_times = ex_inquire_int(id, EX_INQ_TIME);
           real_array_resize(times, num_times);
-          ex_get_all_times(id, times->data);
+          if (num_times > 0)
+          {
+            ex_get_all_times(id, times->data);
+          }
         }
       }
     }
@@ -219,6 +241,8 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
                                        const char* filename,
                                        int mode)
 {
+  set_ex_opts();
+
   exodus_file_t* file = polymec_malloc(sizeof(exodus_file_t));
   file->last_time_index = 0;
   file->comm = comm;
@@ -255,7 +279,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
     }
   }
 #else
-  if (mode | EX_READ)
+  if (mode & EX_READ)
   {
     file->ex_id = ex_open(filename, mode, &real_size,
                           &file->ex_real_size, &file->ex_version);
