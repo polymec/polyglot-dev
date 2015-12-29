@@ -14,7 +14,9 @@
 #include "exodusII_par.h"
 #endif 
 
+#include "netcdf.h"
 #include "exodusII.h"
+#include "exodusII_int.h"
 
 // This flag is set to true when logging options are set for the Exodus library.
 static bool ex_opts_set = false;
@@ -353,7 +355,8 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
   }
   else
   {
-    log_debug("open_exodus_file: ex_open failed with error code %d", exerrval);
+    if (exerrval != EX_FATAL)
+      log_debug("open_exodus_file: ex_open failed: %s", nc_strerror(exerrval));
     polymec_free(file);
     file = NULL;
   }
