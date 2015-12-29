@@ -276,7 +276,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
     }
   }
 #else
-  if (mode | EX_READ)
+  if (mode & EX_READ)
   {
     file->ex_id = ex_open(filename, mode, &real_size,
                           &file->ex_real_size, &file->ex_version);
@@ -355,8 +355,6 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
   }
   else
   {
-    if (exerrval != EX_FATAL)
-      log_debug("open_exodus_file: ex_open failed: %s", nc_strerror(exerrval));
     polymec_free(file);
     file = NULL;
   }
@@ -367,7 +365,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
 exodus_file_t* exodus_file_new(MPI_Comm comm,
                                const char* filename)
 {
-  return open_exodus_file(comm, filename, EX_WRITE | EX_CLOBBER | EX_NETCDF4);
+  return open_exodus_file(comm, filename, EX_CLOBBER | EX_NETCDF4);
 }
 
 exodus_file_t* exodus_file_open(MPI_Comm comm,
