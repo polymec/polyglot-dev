@@ -20,9 +20,6 @@ struct fe_block_t
 
   int* elem_node_offsets;
   int* elem_nodes;
-
-  int* elem_edge_offsets;
-  int* elem_edges;
 };
 
 fe_block_t* fe_block_new(int num_elem,
@@ -47,9 +44,6 @@ fe_block_t* fe_block_new(int num_elem,
   // Elements don't understand their faces.
   block->elem_face_offsets = NULL;
   block->elem_faces = NULL;
-
-  block->elem_edge_offsets = NULL;
-  block->elem_edges = NULL;
 
   return block;
 }
@@ -81,9 +75,6 @@ fe_block_t* polyhedral_fe_block_new(int num_elem,
   block->elem_node_offsets = NULL;
   block->elem_nodes = NULL;
 
-  block->elem_edge_offsets = NULL;
-  block->elem_edges = NULL;
-
   return block;
 }
 
@@ -112,52 +103,48 @@ int fe_block_num_elements(fe_block_t* block)
 
 int fe_block_num_element_nodes(fe_block_t* block, int elem_index)
 {
-  int offset = block->elem_node_offsets[elem_index];
-  return block->elem_node_offsets[elem_index+1] - offset;
+  if (block->elem_node_offsets != NULL)
+  {
+    int offset = block->elem_node_offsets[elem_index];
+    return block->elem_node_offsets[elem_index+1] - offset;
+  }
+  else
+    return -1;
 }
 
 void fe_block_get_element_nodes(fe_block_t* block, 
                                 int elem_index, 
                                 int* elem_nodes)
 {
-  int offset = block->elem_node_offsets[elem_index];
-  int num_nodes = block->elem_node_offsets[elem_index+1] - offset;
-  memcpy(elem_nodes, &block->elem_nodes[offset], sizeof(int) * num_nodes);
+  if (block->elem_nodes != NULL)
+  {
+    int offset = block->elem_node_offsets[elem_index];
+    int num_nodes = block->elem_node_offsets[elem_index+1] - offset;
+    memcpy(elem_nodes, &block->elem_nodes[offset], sizeof(int) * num_nodes);
+  }
 }
 
 int fe_block_num_element_faces(fe_block_t* block, int elem_index)
 {
-  int offset = block->elem_face_offsets[elem_index];
-  return block->elem_face_offsets[elem_index+1] - offset;
+  if (block->elem_face_offsets != NULL)
+  {
+    int offset = block->elem_face_offsets[elem_index];
+    return block->elem_face_offsets[elem_index+1] - offset;
+  }
+  else 
+    return -1;
 }
 
 void fe_block_get_element_faces(fe_block_t* block, 
                                 int elem_index, 
                                 int* elem_faces)
 {
-  int offset = block->elem_face_offsets[elem_index];
-  int num_faces = block->elem_face_offsets[elem_index+1] - offset;
-  memcpy(elem_faces, &block->elem_faces[offset], sizeof(int) * num_faces);
-}
-
-int fe_block_num_element_edges(fe_block_t* block, int elem_index)
-{
-  int offset = block->elem_edge_offsets[elem_index];
-  return block->elem_edge_offsets[elem_index+1] - offset;
-}
-
-void fe_block_get_element_edges(fe_block_t* block, 
-                                int elem_index, 
-                                int* elem_edges)
-{
-  int offset = block->elem_edge_offsets[elem_index];
-  int num_faces = block->elem_edge_offsets[elem_index+1] - offset;
-  memcpy(elem_edges, &block->elem_edges[offset], sizeof(int) * num_faces);
-}
-
-serializer_t* fe_block_serializer()
-{
-  return serializer_new("fe_block", NULL, NULL, NULL, NULL);
+  if (block->elem_faces != NULL)
+  {
+    int offset = block->elem_face_offsets[elem_index];
+    int num_faces = block->elem_face_offsets[elem_index+1] - offset;
+    memcpy(elem_faces, &block->elem_faces[offset], sizeof(int) * num_faces);
+  }
 }
 
 struct fe_mesh_t 
@@ -394,91 +381,62 @@ void fe_mesh_get_element_faces(fe_mesh_t* mesh,
   fe_block_get_element_faces(block, e, elem_faces);
 }
 
-int fe_mesh_num_element_edges(fe_mesh_t* mesh, int elem_index)
-{
-  // Find the block that houses this element.
-  int b = 0;
-  if (mesh->blocks->size > 1)
-  {
-    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
-           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
-    if (b == mesh->block_elem_offsets->size-1)
-      return -1;
-  }
-
-  // Now ask the block about the element.
-  fe_block_t* block = mesh->blocks->data[b];
-  int e = elem_index - mesh->block_elem_offsets->data[b];
-  return fe_block_num_element_edges(block, e);
-}
-
-void fe_mesh_get_element_edges(fe_mesh_t* mesh, 
-                               int elem_index, 
-                               int* elem_edges)
-{
-  // Find the block that houses this element.
-  int b = 0;
-  if (mesh->blocks->size > 1)
-  {
-    while ((mesh->block_elem_offsets->data[b] < elem_index) && 
-           ((b+1) <= mesh->block_elem_offsets->size)) ++b;
-    if (b == mesh->block_elem_offsets->size-1)
-      return;
-  }
-
-  // Now ask the block about the element.
-  fe_block_t* block = mesh->blocks->data[b];
-  int e = elem_index - mesh->block_elem_offsets->data[b];
-  fe_block_get_element_edges(block, e, elem_edges);
-}
-
 int fe_mesh_num_faces(fe_mesh_t* mesh)
 {
   return mesh->num_faces;
 }
 
-int fe_mesh_num_face_edges(fe_mesh_t* mesh,
-                           int face_index)
-{
-  int offset = mesh->face_edge_offsets[face_index];
-  return mesh->face_edge_offsets[face_index+1] - offset;
-}
-
-void fe_mesh_get_face_edges(fe_mesh_t* mesh, 
-                            int face_index, 
-                            int* face_edges)
-{
-  int offset = mesh->face_edge_offsets[face_index];
-  int num_edges = mesh->face_edge_offsets[face_index+1] - offset;
-  memcpy(face_edges, &mesh->face_edges[offset], sizeof(int) * num_edges);
-}
-
 int fe_mesh_num_face_nodes(fe_mesh_t* mesh,
                            int face_index)
 {
-  int offset = mesh->face_node_offsets[face_index];
-  return mesh->face_node_offsets[face_index+1] - offset;
+  if (mesh->face_node_offsets != NULL)
+  {
+    int offset = mesh->face_node_offsets[face_index];
+    return mesh->face_node_offsets[face_index+1] - offset;
+  }
+  else
+    return -1;
 }
 
 void fe_mesh_get_face_nodes(fe_mesh_t* mesh, 
                             int face_index, 
                             int* face_nodes)
 {
-  int offset = mesh->face_node_offsets[face_index];
-  int num_nodes = mesh->face_node_offsets[face_index+1] - offset;
-  memcpy(face_nodes, &mesh->face_nodes[offset], sizeof(int) * num_nodes);
+  if (mesh->face_nodes != NULL)
+  {
+    int offset = mesh->face_node_offsets[face_index];
+    int num_nodes = mesh->face_node_offsets[face_index+1] - offset;
+    memcpy(face_nodes, &mesh->face_nodes[offset], sizeof(int) * num_nodes);
+  }
+}
+
+int fe_mesh_num_face_edges(fe_mesh_t* mesh,
+                           int face_index)
+{
+  if (mesh->face_edge_offsets != NULL)
+  {
+    int offset = mesh->face_edge_offsets[face_index];
+    return mesh->face_edge_offsets[face_index+1] - offset;
+  }
+  else
+    return -1;
+}
+
+void fe_mesh_get_face_edges(fe_mesh_t* mesh, 
+                            int face_index, 
+                            int* face_edges)
+{
+  if (mesh->face_edges != NULL)
+  {
+    int offset = mesh->face_edge_offsets[face_index];
+    int num_edges = mesh->face_edge_offsets[face_index+1] - offset;
+    memcpy(face_edges, &mesh->face_edges[offset], sizeof(int) * num_edges);
+  }
 }
 
 int fe_mesh_num_edges(fe_mesh_t* mesh)
 {
   return mesh->num_edges;
-}
-
-int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
-                           int edge_index)
-{
-  int offset = mesh->edge_node_offsets[edge_index];
-  return mesh->edge_node_offsets[edge_index+1] - offset;
 }
 
 void fe_mesh_set_face_nodes(fe_mesh_t* mesh, 
@@ -496,13 +454,28 @@ void fe_mesh_set_face_nodes(fe_mesh_t* mesh,
   memcpy(mesh->face_nodes, face_nodes, sizeof(int) * mesh->face_node_offsets[num_faces]);
 }
 
+int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
+                           int edge_index)
+{
+  if (mesh->edge_node_offsets != NULL)
+  {
+    int offset = mesh->edge_node_offsets[edge_index];
+    return mesh->edge_node_offsets[edge_index+1] - offset;
+  }
+  else
+    return -1;
+}
+
 void fe_mesh_get_edge_nodes(fe_mesh_t* mesh, 
                             int edge_index, 
                             int* edge_nodes)
 {
-  int offset = mesh->edge_node_offsets[edge_index];
-  int num_nodes = mesh->edge_node_offsets[edge_index+1] - offset;
-  memcpy(edge_nodes, &mesh->edge_nodes[offset], sizeof(int) * num_nodes);
+  if (mesh->edge_nodes != NULL)
+  {
+    int offset = mesh->edge_node_offsets[edge_index];
+    int num_nodes = mesh->edge_node_offsets[edge_index+1] - offset;
+    memcpy(edge_nodes, &mesh->edge_nodes[offset], sizeof(int) * num_nodes);
+  }
 }
 
 int fe_mesh_num_nodes(fe_mesh_t* mesh)
@@ -613,11 +586,6 @@ int* fe_mesh_create_side_set(fe_mesh_t* mesh, const char* name, int size)
 bool fe_mesh_next_side_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
 {
   return tagger_next_tag(mesh->side_sets, pos, name, set, size);
-}
-
-serializer_t* fe_mesh_serializer()
-{
-  return serializer_new("fe_mesh", NULL, NULL, NULL, NULL);
 }
 
 //------------------------------------------------------------------------

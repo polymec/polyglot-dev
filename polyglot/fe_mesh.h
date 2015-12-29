@@ -62,35 +62,29 @@ fe_mesh_element_t fe_block_element_type(fe_block_t* block);
 // Returns the number of elements in the given block.
 int fe_block_num_elements(fe_block_t* block);
 
-// Returns the number of nodes in the given element within the block.
+// Returns the number of nodes in the given element within the block. If 
+// the mesh does not contain element->node connectivity, -1 is returned.
 int fe_block_num_element_nodes(fe_block_t* block, int elem_index);
 
 // Retrieves the indices of nodes for the given element within the block, 
 // copying them into elem_node_indices, which must be large enough to store 
-// them.
+// them. If the mesh does not contain element->node connectivity, this function
+// has no effect.
 void fe_block_get_element_nodes(fe_block_t* block, 
                                 int elem_index, 
                                 int* elem_nodes);
 
-// Returns the number of faces in the given element within the block.
+// Returns the number of faces in the given element within the block. If the 
+// mesh does not contain element->face connectivity, -1 is returned.
 int fe_block_num_element_faces(fe_block_t* block, int elem_index);
 
 // Retrieves the indices of faces for the given element within the block, 
 // copying them into elem_face_indices, which must be large enough to store 
-// them.
+// them. If the mesh does not contain element->face connectivity, this function
+// has no effect.
 void fe_block_get_element_faces(fe_block_t* block, 
                                 int elem_index, 
                                 int* elem_faces);
-
-// Returns the number of edges in the given element within the block.
-int fe_block_num_element_edges(fe_block_t* block, int elem_index);
-
-// Retrieves the indices of edges for the given element within the block, 
-// copying them into elem_edge_indices, which must be large enough to store 
-// them.
-void fe_block_get_element_edges(fe_block_t* block, 
-                                int elem_index, 
-                                int* elem_edges);
 
 // Returns a serializer object that can read/write finite element blocks 
 // from/to byte arrays.
@@ -136,77 +130,77 @@ bool fe_mesh_next_block(fe_mesh_t* mesh,
 // Returns the number of elements in the fe_mesh.
 int fe_mesh_num_elements(fe_mesh_t* mesh);
 
-// Returns the number of nodes in the given element within the mesh.
+// Returns the number of nodes in the given element within the mesh. If the 
+// mesh does not contain element->node connectivity, -1 is returned.
 int fe_mesh_num_element_nodes(fe_mesh_t* mesh, int elem_index);
 
 // Retrieves the indices of nodes for the given element within the mesh, 
 // copying them into elem_node_indices, which must be large enough to store 
-// them.
+// them. If the mesh does not contain element->node connectivity, this function
+// has no effect.
 void fe_mesh_get_element_nodes(fe_mesh_t* mesh, 
                                int elem_index, 
                                int* elem_nodes);
 
-// Returns the number of faces in the given element within the mesh.
+// Returns the number of faces in the given element within the mesh. If the 
+// mesh does not contain element->face connectivity, -1 is returned.
 int fe_mesh_num_element_faces(fe_mesh_t* mesh, int elem_index);
 
 // Retrieves the indices of faces for the given element within the mesh, 
 // copying them into elem_face_indices, which must be large enough to store 
-// them.
+// them. If the mesh does not contain element->face connectivity, this function
+// has no effect.
 void fe_mesh_get_element_faces(fe_mesh_t* mesh, 
                                int elem_index, 
                                int* elem_faces);
 
-// Returns the number of edges in the given element within the mesh.
-int fe_mesh_num_element_edges(fe_mesh_t* mesh, int elem_index);
-
-// Retrieves the indices of edges for the given element within the mesh, 
-// copying them into elem_edge_indices, which must be large enough to store 
-// them.
-void fe_mesh_get_element_edges(fe_mesh_t* mesh, 
-                               int elem_index, 
-                               int* elem_edges);
-
 // Returns the number of faces in the fe_mesh.
 int fe_mesh_num_faces(fe_mesh_t* mesh);
 
-// Returns the number of edges in the given face within an fe_mesh.
-int fe_mesh_num_face_edges(fe_mesh_t* mesh,
-                           int face_index);
-
-// Retrieves the indices of edges for the given face within the mesh, 
-// copying them into face_edge_indices, which must be large enough to store 
-// them.
-void fe_mesh_get_face_edges(fe_mesh_t* mesh, 
-                            int face_index, 
-                            int* face_edges);
-
-// Returns the number of nodes in the given face within an fe_mesh.
+// Returns the number of nodes in the given face within an fe_mesh. If the 
+// mesh does not contain face->node connectivity, -1 is returned.
 int fe_mesh_num_face_nodes(fe_mesh_t* mesh,
                            int face_index);
 
 // Retrieves the indices of nodes for the given face within the mesh, 
 // copying them into face_node_indices, which must be large enough to store 
-// them.
+// them. If the mesh does not contain face->node connectivity, this function 
+// has no effect.
 void fe_mesh_get_face_nodes(fe_mesh_t* mesh, 
                             int face_index, 
                             int* face_nodes);
 
+// Returns the number of edges in the given face within an fe_mesh. If the
+// mesh does not contain face->edge connectivity, -1 is returned.
+int fe_mesh_num_face_edges(fe_mesh_t* mesh,
+                           int face_index);
+
+// Retrieves the indices of edges for the given face within the mesh, 
+// copying them into face_edge_indices, which must be large enough to store 
+// them. If the mesh does not contain face->edge connectivity, this function 
+// has no effect.
+void fe_mesh_get_face_edges(fe_mesh_t* mesh, 
+                            int face_index, 
+                            int* face_edges);
+
 // Returns the number of edges in the fe_mesh.
 int fe_mesh_num_edges(fe_mesh_t* mesh);
 
+// Returns the number of nodes in the given edge within an fe_mesh. If the
+// mesh does not contain edge->node connectivity, -1 is returned.
+int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
+                           int edge_index);
+
 // Retrieves the indices of nodes for the given edge within the mesh, 
 // copying them into edge_node_indices, which must be large enough to store 
-// them.
+// them. If the mesh does not contain edge->node connectivity, this function 
+// has no effect.
 void fe_mesh_get_edge_nodes(fe_mesh_t* mesh, 
                             int edge_index, 
                             int* edge_nodes);
 
 // Returns the number of nodes in the fe_mesh.
 int fe_mesh_num_nodes(fe_mesh_t* mesh);
-
-// Returns the number of nodes in the given edge within an fe_mesh.
-int fe_mesh_num_edge_nodes(fe_mesh_t* mesh,
-                           int edge_index);
 
 // Establishes face->node connectivity. num_face_nodes[i] contains the 
 // number of nodes for the ith face in the mesh, and face_nodes contains the 
