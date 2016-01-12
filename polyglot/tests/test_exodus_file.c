@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <string.h>
-#include "cmockery.h"
+#include "cmocka.h"
 #include "polyglot/exodus_file.h"
 
 void test_exodus_file_query(void** state)
@@ -290,13 +290,13 @@ int main(int argc, char* argv[])
 {
   polymec_init(argc, argv);
   set_log_level(LOG_DEBUG);
-  const UnitTest tests[] = 
+  const struct CMUnitTest tests[] = 
   {
-    unit_test(test_exodus_file_query),
-    unit_test(test_write_exodus_file),
-    unit_test(test_read_exodus_file),
-    unit_test(test_read_poly_exodus_file),
-    unit_test(test_write_poly_exodus_file)
+    cmocka_unit_test(test_exodus_file_query),
+    cmocka_unit_test(test_write_exodus_file),
+    cmocka_unit_test(test_read_exodus_file),
+    cmocka_unit_test(test_read_poly_exodus_file),
+    cmocka_unit_test(test_write_poly_exodus_file)
   };
-  return run_tests(tests);
+  return cmocka_run_group_tests(tests, NULL, NULL);
 }

@@ -9,7 +9,7 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <string.h>
-#include "cmockery.h"
+#include "cmocka.h"
 #include "geometry/create_uniform_mesh.h"
 #include "polyglot/exodus_file.h"
 
@@ -46,10 +46,10 @@ void test_fe_mesh_from_mesh(void** state)
 int main(int argc, char* argv[]) 
 {
   polymec_init(argc, argv);
-  const UnitTest tests[] = 
+  const struct CMUnitTest tests[] = 
   {
-    unit_test(test_mesh_from_fe_mesh),
-    unit_test(test_fe_mesh_from_mesh)
+    cmocka_unit_test(test_mesh_from_fe_mesh),
+    cmocka_unit_test(test_fe_mesh_from_mesh)
   };
-  return run_tests(tests);
+  return cmocka_run_group_tests(tests, NULL, NULL);
 }
