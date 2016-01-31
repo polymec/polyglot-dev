@@ -8,8 +8,7 @@
 #include <strings.h>
 #include "core/polymec.h"
 #include "core/options.h"
-#include "core/interpreter.h"
-#include "geometry/interpreter_register_geometry_functions.h"
+#include "model/interpreter.h"
 #include "polyglot/interpreter_register_polyglot_functions.h"
 
 static void mesher_usage(FILE* stream)
@@ -127,7 +126,6 @@ int main(int argc, char** argv)
 
     // Set up an interpreter for parsing the input file.
     interp = interpreter_new(NULL);
-    interpreter_register_geometry_functions(interp);
     interpreter_register_polyglot_functions(interp);
     interpreter_register_mesher_functions(interp);
 
@@ -148,7 +146,6 @@ int main(int argc, char** argv)
     if (input != NULL)
     {
       interp = interpreter_new(NULL);
-      interpreter_register_geometry_functions(interp);
       interpreter_register_mesher_functions(interp);
     }
   }
