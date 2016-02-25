@@ -9,6 +9,7 @@ if (BUILD_SHARED_LIBS)
     target_link_libraries(polyglot ${lib})
   endforeach()
 endif()
+add_dependencies(polyglot update_version_h) # <-- needed on Mac(?!)
 
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_LIBRARIES};${POLYMEC_LIBRARIES} PARENT_SCOPE)
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_LIBRARIES};${POLYMEC_LIBRARIES})
