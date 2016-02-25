@@ -37,6 +37,12 @@ if (NOT EXISTS ${NETCDF_LIBRARY})
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/netcdf_build_errors.log ${netcdf_build_err})
     message(FATAL_ERROR "Error building netcdf library. See ${CMAKE_CURRENT_BINARY_DIR}/netcdf_build*.log for details.")
   endif()
+
+  # On Macs we need to change the rpath of shared libraries so we can install them elsewhere.
+  if (APPLE AND BUILD_SHARED_LIBS)
+    execute_process(COMMAND install_name_tool -id @rpath/libnetcdf${LIB_SUFFIX} ${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX})
+  endif()
+
 endif()
 
 if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
@@ -92,6 +98,12 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX}")
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus_build_errors.log ${exodus_build_err})
     message(FATAL_ERROR "Error building exodus library. See ${CMAKE_CURRENT_BINARY_DIR}/exodus_build*.log for details.")
   endif()
+
+  # On Macs we need to change the rpath of shared libraries so we can install them elsewhere.
+  if (APPLE AND BUILD_SHARED_LIBS)
+    execute_process(COMMAND install_name_tool -id @rpath/libexodus${LIB_SUFFIX} ${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX})
+  endif()
+
 endif()
 if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
   foreach (header exodusII.h;exodusII_cfg.h;exodusII_int.h)
