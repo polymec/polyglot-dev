@@ -9,7 +9,6 @@
 #define POLYGLOT_H
 
 #include "core/polymec.h"
-#include "polyglot/polyglot_version.h"
 
 #endif
 

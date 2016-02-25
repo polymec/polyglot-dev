@@ -39,6 +39,10 @@ endif()
 add_custom_target(update_version_h ALL
                   python ${POLYMEC_PREFIX}/share/polymec/update_version_h.py polyglot ${POLYGLOT_VERSION} ${PROJECT_BINARY_DIR}/polyglot/polyglot_version.h)
 
+# Look for libraries in these directories.
+link_directories("${PROJECT_BINARY_DIR}/lib")
+link_directories("${POLYMEC_PREFIX}/lib")
+
 # Build 3rd-party libraries.
 add_subdirectory(3rdparty)
 
@@ -46,10 +50,6 @@ add_subdirectory(3rdparty)
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_BINARY_DIR})
 include_directories(${PROJECT_BINARY_DIR}/include)
-
-# Look for libraries in these directories.
-link_directories("${PROJECT_BINARY_DIR}/lib")
-link_directories("${POLYMEC_PREFIX}/lib")
 
 enable_testing()
 

@@ -10,6 +10,7 @@
 
 #include "core/polymec_version.h"
 #include "polyglot/polyglot.h"
+#include "polyglot/polyglot_version.h"
 
 #if POLYMEC_MAJOR_VERSION != POLYGLOT_MAJOR_VERSION
 #error "The installed major version of polymec differs from that of polyglot. Please make sure these versions match."
