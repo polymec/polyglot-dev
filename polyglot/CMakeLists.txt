@@ -1,7 +1,12 @@
+include(add_polymec_library)
+
 # Library.
-add_library(polyglot polyglot.c import_tetgen_mesh.c 
-            fe_mesh.c exodus_file.c cf_file.c 
-            interpreter_register_polyglot_functions.c)
+add_polymec_library(polyglot polyglot.c import_tetgen_mesh.c 
+                    fe_mesh.c exodus_file.c cf_file.c 
+                    interpreter_register_polyglot_functions.c)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(polyamri ${POLYGLOT_LIBRARIES};${POLYMEC_LIBRARIES})
+endif()
 
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_LIBRARIES};${POLYMEC_LIBRARIES} PARENT_SCOPE)
 set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_LIBRARIES};${POLYMEC_LIBRARIES})

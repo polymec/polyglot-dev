@@ -1,9 +1,6 @@
 # Minimum CMake version.
 cmake_minimum_required (VERSION 2.8.5)
 
-# Build everything as static libs.
-set (BUILD_SHARED_LIBS OFF)
-
 # Project and version numbers.
 project (polyglot)
 set (POLYGLOT_MAJOR_VERSION 0)
@@ -22,6 +19,11 @@ if (NOT DEFINED POLYMEC_VERSION)
   message(FATAL_ERROR "Could not find polymec library. Please use the polymec=/path/to/polymec option.")
 endif()
 message("-- Found polymec library in ${POLYMEC_PREFIX} (v${POLYMEC_VERSION})")
+
+# Build everything the way Polymec does.
+set(BUILD_SHARED_LIBS ${POLYMEC_BUILD_SHARED_LIBS})
+set(CMAKE_MACOSX_RPATH TRUE)
+set(CMAKE_INSTALL_RPATH "${POLYMEC_PREFIX}/lib")
 
 # Do we have polyamri?
 if (EXISTS ${POLYMEC_PREFIX}/share/polymec/polyamri.cmake)
