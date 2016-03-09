@@ -21,7 +21,10 @@ void test_cf_file_open(void** state)
   assert_int_equal(0, minor);
   assert_int_equal(0, patch);
   assert_true(cf_file_has_latlon_grid(cf));
+  assert_true(cf_file_has_time_series(cf));
   assert_true(cf_file_has_latlon_surface_var(cf, "area"));
+  assert_true(cf_file_has_latlon_surface_var(cf, "pr"));
+  assert_true(cf_file_has_latlon_surface_var(cf, "tas"));
   assert_true(cf_file_has_latlon_var(cf, "ua"));
   cf_file_close(cf);
 }

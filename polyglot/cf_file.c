@@ -272,7 +272,10 @@ cf_file_t* cf_file_open(const char* filename)
 
   err = nc_inq_dimid(cf->file_id, "time", &dim_id);
   if (err == NC_NOERR)
+  {
     cf->time_dim = dim_id;
+    cf->time_id = var_identifier(cf->file_id, "time");
+  }
   else if (err != NC_EBADDIM)
     polymec_error("cf_file_open: Error retrieving time dim ID: ", nc_strerror(err));
 
