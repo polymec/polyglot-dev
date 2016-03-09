@@ -145,7 +145,7 @@ void cf_file_get_latlon_points(cf_file_t* file,
                                real_t* longitude_points,
                                real_t* vertical_points);
 
-// Sets up the time variable within the CF file, specifying units and 
+// Sets up the time series variable within the CF file, specifying units and 
 // a calendar to use. Available units are:
 //   day (d), hour (hr, h), minute (min), second (sec, s)
 // Plural forms may be used as well, and "since xyz" where xyz is a timestamp
@@ -155,6 +155,13 @@ void cf_file_get_latlon_points(cf_file_t* file,
 void cf_file_define_time(cf_file_t* file,
                          const char* time_units,
                          const char* calendar);
+
+// Returns true if this file contains a time series, false if not.
+bool cf_file_has_time_series(cf_file_t* file);
+
+// Returns the number of time in the file's time series, or 0 if the file has 
+// no time series.
+int cf_file_num_times(cf_file_t* file);
 
 // Retrieves time information (units and calendar) to strings large enough to 
 // hold NC_NAME_MAX+1 characters.
@@ -175,22 +182,31 @@ void cf_file_define_latlon_var(cf_file_t* file,
                                const char* units);
 
 // Fetches metadata for the given lat-lon variable. All strings must 
-// be large enough to hold POLYGLOT_CF_MAX_NAME+1 characters.
+// be large enough to hold POLYGLOT_CF_MAX_NAME+1 characters. The variable has
+// dimensions (lat, lon, vertical) if there is no time series, and 
+// (time, lat, lon, vertical) if there is.
 void cf_file_get_latlon_var_metadata(cf_file_t* file, 
                                      const char* var_name,
                                      char* short_name,
                                      char* long_name,
                                      char* units);
 
+// Returns true if this file contains a lat-lon variable with the given name,
+// false otherwise.
+bool cf_file_has_latlon_var(cf_file_t* file,
+                            const char* var_name);
+
 // Writes a variable that is defined on the points of a lat-lon grid, 
-// specifying a time index that associates this entry with a given time.
+// specifying a time index that associates this entry with a given time. This 
+// time index is ignored if the file has no time series.
 void cf_file_write_latlon_var(cf_file_t* file, 
                               const char* var_name,
                               int time_index, 
                               real_t* var_data);
 
 // Reads a variable that is defined on the points of a lat-lon grid, 
-// specifying an index for the time at which the data will be read.
+// specifying an index for the time at which the data will be read. This 
+// time index is ignored if the file has no time series.
 void cf_file_read_latlon_var(cf_file_t* file, 
                              const char* var_name,
                              int time_index, 
