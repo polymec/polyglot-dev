@@ -18,6 +18,16 @@ add_test(NAME generate_exodus_data
 add_polyglot_test(test_exodus_file test_exodus_file.c)
 set_tests_properties(test_exodus_file PROPERTIES DEPENDS generate_exodus_data)
 
+# CF format tests.
+if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cf_test_data.nc)
+  set(cf_test_data_url https://www.unidata.ucar.edu/software/netcdf/examples/sresa1b_ncar_ccsm3-example.nc)
+  message("Downloading NetCDF CF test data: ${cf_test_data_url} -> ${CMAKE_CURRENT_SOURCE_DIR}/cf_test_data.nc")
+  file(DOWNLOAD ${cf_test_data_url} ${CMAKE_CURRENT_SOURCE_DIR}/cf_test_data.nc)
+endif()
+if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cf_test_data.nc)
+  add_polyglot_test(test_cf_file test_cf_file.c)
+endif()
+
 # FE <--> FV mesh conversion.
 add_polyglot_test(test_fe_fv_mesh_conversion test_fe_fv_mesh_conversion.c)
 set_tests_properties(test_fe_fv_mesh_conversion PROPERTIES DEPENDS test_exodus_file)

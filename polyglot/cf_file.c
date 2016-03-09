@@ -22,6 +22,7 @@ struct cf_file_t
 
   // Important identifiers.
   int time_id, lat_id, lon_id, lev_id;
+  char lev_name[POLYGLOT_CF_MAX_NAME+1];
 };
 
 // Helpers.
@@ -30,34 +31,14 @@ static void get_first_attribute(int file_id,
                                 const char* attr,
                                 char* value)
 {
-  size_t attr_len;
-  int err = nc_inq_attlen(file_id, var_id, attr, &attr_len);
-  if (err != NC_NOERR)
+  int err = nc_get_att_text(file_id, var_id, attr, value);
+  if (err == NC_ENOTATT)
+    value[0] = '\0';
+  else if (err != NC_NOERR)
   {
-    polymec_error("cf_file: Error retrieving length of attribute %s: %s", 
+    polymec_error("cf_file: Error retrieving attribute %s: %s", 
                   attr, nc_strerror(err));
   }
-  if (attr_len > 1)
-  {
-    char attrs[attr_len][NC_MAX_NAME+1];
-    int err = nc_get_att_string(file_id, var_id, attr, (char**)&attrs[0]);
-    if (err != NC_NOERR)
-    {
-      polymec_error("cf_file: Error retrieving attribute %s: %s", 
-                    attr, nc_strerror(err));
-    }
-  }
-  else if (attr_len == 1)
-  {
-    int err = nc_get_att_string(file_id, var_id, attr, &value);
-    if (err != NC_NOERR)
-    {
-      polymec_error("cf_file: Error retrieving attribute %s: %s", 
-                    attr, nc_strerror(err));
-    }
-  }
-  else
-    value[0] = '\0';
 }
 
 static void get_first_global_attribute(int file_id,
@@ -72,7 +53,7 @@ static void put_attribute(int file_id,
                           const char* attr,
                           const char* value)
 {
-  int err = nc_put_att_string(file_id, var_id, attr, 1, &value);
+  int err = nc_put_att_text(file_id, var_id, attr, 1, value);
   if (err != NC_NOERR)
   {
     polymec_error("cf_file: Error setting attribute %s: %s", 
@@ -96,6 +77,93 @@ static int var_identifier(int file_id, const char* var_name)
     return id;
 }
 
+void find_vertical_dimension(int file_id, int* lev_id, char* lev_name)
+{
+  // This name should identify a dimension AND a variable, and the variable should 
+  // have a "units" attribute, and a "positive" attribute (OR have a valid 
+  // set of pressure units).
+  int nvarsp;
+  int err = nc_inq(file_id, NULL, &nvarsp, NULL, NULL);
+  if (err != NC_NOERR)
+    polymec_error("cf_file_open: Error retrieving number of vars: ", nc_strerror(err));
+  for (int var_id = 0; var_id < nvarsp; ++var_id)
+  {
+    // Find the name of this variable.
+    char var_name[POLYGLOT_CF_MAX_NAME+1];
+    err = nc_inq_varname(file_id, var_id, var_name);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_open: Error retrieving name of var %d: ", var_id, nc_strerror(err));
+
+    // The vertical coordinate variable should have a single dimension.
+    int ndim;
+    err = nc_inq_varndims(file_id, var_id, &ndim);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_open: Error retrieving number of dims for var %d: ", var_id, nc_strerror(err));
+    if (ndim != 1) continue;
+
+    // Find its dimension, and verify the dimensions's name is the same.
+    int dim_id;
+    char dim_name[POLYGLOT_CF_MAX_NAME+1];
+    err = nc_inq_vardimid(file_id, var_id, &dim_id);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_open: Error retrieving dim ID for var %d: ", var_id, nc_strerror(err));
+    err = nc_inq_dimname(file_id, dim_id, dim_name);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_open: Error retrieving dim name for var %d: ", var_id, nc_strerror(err));
+    if (strcmp(dim_name, var_name) != 0) continue;
+
+    // If there's an axis attribute set equal to Z, this is it.
+    char axis[POLYGLOT_CF_MAX_NAME+1];
+    get_first_attribute(file_id, var_id, "axis", axis);
+    if (strcmp(axis, "Z") == 0)
+    {
+      *lev_id = var_id;
+      strcpy(lev_name, var_name);
+      return;
+    }
+
+    // If this has a standard name indicating a vertical coordinate, 
+    // we're finished.
+    char standard_name[POLYGLOT_CF_MAX_NAME+1];
+    get_first_attribute(file_id, var_id, "standard_name", standard_name);
+    if ((strcmp(standard_name, "altitude") == 0) ||
+        (strcmp(standard_name, "height") == 0))
+    {
+      *lev_id = var_id;
+      strcpy(lev_name, var_name);
+      return;
+    }
+
+    // Look for a units attribute.
+    char units[POLYGLOT_CF_MAX_NAME+1];
+    get_first_attribute(file_id, var_id, "units", units);
+
+    // Now look for a positive attribute with a valid value.
+    char positive[POLYGLOT_CF_MAX_NAME+1];
+    get_first_attribute(file_id, var_id, "positive", positive);
+    if ((strlen(positive) > 0) &&
+        (string_casecmp(positive, "up") != 0) && 
+        (string_casecmp(positive, "down") != 0)) continue;
+
+    // If we didn't find a positive attribute, see whether the units 
+    // indicate a pressure.
+    if ((strlen(positive) == 0) && 
+        ((strcmp(units, "bar") == 0) || 
+         (strcmp(units, "millibar") == 0) ||
+         (strcmp(units, "decibar") == 0) || 
+         (strcmp(units, "atmosphere") == 0) ||
+         (strcmp(units, "atm") == 0) ||
+         (strcmp(units, "pascal") == 0) ||
+         (strcmp(units, "pa") == 0) ||
+         (strcmp(units, "hPa") == 0)))
+    {
+      *lev_id = var_id;
+      strcpy(lev_name, var_name);
+      return;
+    }
+  }
+}
+
 // Implementation.
 
 cf_file_t* cf_file_new(const char* filename)
@@ -114,12 +182,13 @@ cf_file_t* cf_file_new(const char* filename)
   cf->writing = true;
 
   cf->time_id = cf->lat_id = cf->lon_id = cf->lev_id = -1;
+  strcpy(cf->lev_name, "lev");
 
   // Write in our conventions.
   char conventions[NC_MAX_NAME+1];
   snprintf(conventions, NC_MAX_NAME, "CF-%d.%d.%d", cf->cf_major_version, 
            cf->cf_minor_version, cf->cf_patch_version);
-  err = nc_put_att_string(cf->file_id, NC_GLOBAL, "Conventions", 1, (const char**)&conventions);
+  err = nc_put_att_text(cf->file_id, NC_GLOBAL, "Conventions", 1, conventions);
   if (err != NC_NOERR)
     polymec_error("cf_file_new: Couldn't write Conventions attribute: %s", nc_strerror(err));
 
@@ -163,6 +232,27 @@ cf_file_t* cf_file_open(const char* filename)
   polymec_free(versions);
 
   // Snoop around and see what's here.
+  int dim_id;
+  err = nc_inq_dimid(cf->file_id, "lat", &dim_id);
+  if (err == NC_NOERR)
+    cf->lat_id = dim_id;
+  else if (err != NC_EBADDIM)
+    polymec_error("cf_file_open: Error retrieving lat dim ID: ", nc_strerror(err));
+
+  err = nc_inq_dimid(cf->file_id, "lon", &dim_id);
+  if (err == NC_NOERR)
+    cf->lon_id = dim_id;
+  else if (err != NC_EBADDIM)
+    polymec_error("cf_file_open: Error retrieving lon dim ID: ", nc_strerror(err));
+
+  err = nc_inq_dimid(cf->file_id, "time", &dim_id);
+  if (err == NC_NOERR)
+    cf->time_id = dim_id;
+  else if (err != NC_EBADDIM)
+    polymec_error("cf_file_open: Error retrieving time dim ID: ", nc_strerror(err));
+
+  // We have to figure out the vertical dimension / coordinate name and ID. 
+  find_vertical_dimension(cf->file_id, &cf->lev_id, cf->lev_name);
 
   return cf;
 }
@@ -312,10 +402,10 @@ void cf_file_define_latlon_grid(cf_file_t* file,
   put_attribute(file->file_id, file->lon_id, "units", longitude_units);
 
   // Vertical metadata.
-  err = nc_def_dim(file->file_id, "lev", num_vertical_points, &dim_id);
+  err = nc_def_dim(file->file_id, file->lev_name, num_vertical_points, &dim_id);
   if (err != NC_NOERR)
     polymec_error("cf_file_define_latlon_grid: Could not define lev dimension: %s", nc_strerror(err));
-  err = nc_def_var(file->file_id, "lev", NC_REAL, 1, &dim_id, &file->lev_id);
+  err = nc_def_var(file->file_id, file->lev_name, NC_REAL, 1, &dim_id, &file->lev_id);
   if (err != NC_NOERR)
     polymec_error("cf_file_define_latlon_grid: Could not define lev variable: %s", nc_strerror(err));
   err = nc_put_var(file->file_id, file->lev_id, vertical_points);
@@ -353,7 +443,7 @@ void cf_file_get_latlon_grid_metadata(cf_file_t* file,
   get_first_attribute(file->file_id, file->lon_id, "units", longitude_units);
 
   // Vertical.
-  *num_latitude_points = cf_file_dimension(file, "lev");
+  *num_latitude_points = cf_file_dimension(file, file->lev_name);
   get_first_attribute(file->file_id, file->lev_id, "units", vertical_units);
   get_first_attribute(file->file_id, file->lev_id, "positive", vertical_orientation);
 }
@@ -478,14 +568,14 @@ void cf_file_define_latlon_var(cf_file_t* file,
     err = nc_inq_vardimid(file->file_id, file->time_id, &time_dim);
     if (err != NC_NOERR)
       polymec_error("cf_file_define_latlon_var: Error retrieving time dim: %s", nc_strerror(err));
-    int dims[4] = {lat_dim, lon_dim, lev_dim, time_dim};
+    int dims[4] = {time_dim, lev_dim, lat_dim, lon_dim};
     err = nc_def_var(file->file_id, var_name, NC_REAL, 4, dims, &var_id);
     if (err != NC_NOERR)
       polymec_error("cf_file_define_latlon_var: Error defining var %s: %s", var_name, nc_strerror(err));
   }
   else
   {
-    int dims[3] = {lat_dim, lon_dim, lev_dim};
+    int dims[3] = {lev_dim, lat_dim, lon_dim};
     err = nc_def_var(file->file_id, var_name, NC_REAL, 3, dims, &var_id);
     if (err != NC_NOERR)
       polymec_error("cf_file_define_latlon_var: Error defining var %s: %s", var_name, nc_strerror(err));
@@ -554,7 +644,7 @@ void cf_file_write_latlon_var(cf_file_t* file,
       polymec_error("cf_file_write_latlon_var: Error getting lev dimension %s", nc_strerror(err));
 
     size_t startp[4] = {time_index, 0, 0, 0};
-    size_t countp[4] = {1, lat_dim, lon_dim, lev_dim};
+    size_t countp[4] = {1, lev_dim, lat_dim, lon_dim};
     err = nc_put_vara(file->file_id, var_id, startp, countp, var_data);
     if (err != NC_NOERR)
       polymec_error("cf_file_write_latlon_var: Error writing data for var %s: %s", var_name, nc_strerror(err));
@@ -596,10 +686,146 @@ void cf_file_read_latlon_var(cf_file_t* file,
       polymec_error("cf_file_read_latlon_var: Error getting lev dimension %s", nc_strerror(err));
 
     size_t startp[4] = {time_index, 0, 0, 0};
-    size_t countp[4] = {1, lat_dim, lon_dim, lev_dim};
+    size_t countp[4] = {1, lev_dim, lat_dim, lon_dim};
     err = nc_get_vara(file->file_id, var_id, startp, countp, var_data);
     if (err != NC_NOERR)
       polymec_error("cf_file_read_latlon_var: Error writing data for var %s: %s", var_name, nc_strerror(err));
+  }
+}
+
+void cf_file_define_latlon_surface_var(cf_file_t* file, 
+                                       const char* var_name,
+                                       const char* short_name,
+                                       const char* long_name,
+                                       const char* units)
+{
+  ASSERT(cf_file_has_latlon_grid(file));
+  ASSERT(!cf_file_has_latlon_surface_var(file, var_name));
+
+  // Define the variable and its dimensions based on whether we have a time 
+  // series.
+  int lat_dim, lon_dim, var_id;
+  int err = nc_inq_vardimid(file->file_id, file->lat_id, &lat_dim);
+  if (err != NC_NOERR)
+    polymec_error("cf_file_define_latlon_surface_var: Error retrieving lat dim: %s", nc_strerror(err));
+  err = nc_inq_vardimid(file->file_id, file->lon_id, &lon_dim);
+  if (err != NC_NOERR)
+    polymec_error("cf_file_define_latlon_surface_var: Error retrieving lon dim: %s", nc_strerror(err));
+  if (cf_file_has_time_series(file))
+  {
+    int time_dim;
+    err = nc_inq_vardimid(file->file_id, file->time_id, &time_dim);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_define_latlon_surface_var: Error retrieving time dim: %s", nc_strerror(err));
+    int dims[3] = {time_dim, lat_dim, lon_dim};
+    err = nc_def_var(file->file_id, var_name, NC_REAL, 3, dims, &var_id);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_define_latlon_surface_var: Error defining var %s: %s", var_name, nc_strerror(err));
+  }
+  else
+  {
+    int dims[2] = {lat_dim, lon_dim};
+    err = nc_def_var(file->file_id, var_name, NC_REAL, 2, dims, &var_id);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_define_latlon_surface_var: Error defining var %s: %s", var_name, nc_strerror(err));
+  }
+
+  // Metadata.
+  put_attribute(file->file_id, var_id, "short_name", short_name);
+  put_attribute(file->file_id, var_id, "long_name", long_name);
+  put_attribute(file->file_id, var_id, "units", units);
+}
+
+void cf_file_get_latlon_surface_var_metadata(cf_file_t* file, 
+                                             const char* var_name,
+                                             char* short_name,
+                                             char* long_name,
+                                             char* units)
+{
+  cf_file_get_latlon_var_metadata(file, var_name, short_name, long_name, units);
+}
+
+bool cf_file_has_latlon_surface_var(cf_file_t* file,
+                                    const char* var_name)
+{
+  return cf_file_has_latlon_var(file, var_name);
+}
+
+void cf_file_write_latlon_surface_var(cf_file_t* file, 
+                                      const char* var_name,
+                                      int time_index, 
+                                      real_t* var_data)
+{
+  ASSERT(cf_file_has_latlon_surface_var(file, var_name));
+
+  int var_id = var_identifier(file->file_id, var_name);
+
+  // If we don't have a time series, we just write the whole thing.
+  if (!cf_file_has_time_series(file))
+  {
+    int err = nc_put_var(file->file_id, var_id, var_data);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_write_latlon_surface_var: Error writing data for var %s: %s", var_name, nc_strerror(err));
+  }
+  // Otherwise, we get fancy and write a hyper slice.
+  else
+  {
+    ASSERT(time_index >= 0);
+    ASSERT(time_index < cf_file_num_times(file));
+
+    // Size up the dimensions.
+    size_t lat_dim, lon_dim;
+    int err = nc_inq_dimlen(file->file_id, file->lat_id, &lat_dim);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_write_latlon_surface_var: Error getting lat dimension %s", nc_strerror(err));
+    err = nc_inq_dimlen(file->file_id, file->lon_id, &lon_dim);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_write_latlon_surface_var: Error getting lon dimension %s", nc_strerror(err));
+
+    size_t startp[4] = {time_index, 0, 0};
+    size_t countp[4] = {1, lat_dim, lon_dim};
+    err = nc_put_vara(file->file_id, var_id, startp, countp, var_data);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_write_latlon_surface_var: Error writing data for var %s: %s", var_name, nc_strerror(err));
+  }
+}
+
+void cf_file_read_latlon_surface_var(cf_file_t* file, 
+                                     const char* var_name,
+                                     int time_index, 
+                                     real_t* var_data)
+{
+  ASSERT(cf_file_has_latlon_surface_var(file, var_name));
+
+  int var_id = var_identifier(file->file_id, var_name);
+
+  // If we don't have a time series, we just write the whole thing.
+  if (!cf_file_has_time_series(file))
+  {
+    int err = nc_get_var(file->file_id, var_id, var_data);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_read_latlon_surface_var: Error reading data for var %s: %s", var_name, nc_strerror(err));
+  }
+  // Otherwise, we get fancy and read a hyper slice.
+  else
+  {
+    ASSERT(time_index >= 0);
+    ASSERT(time_index < cf_file_num_times(file));
+
+    // Size up the dimensions.
+    size_t lat_dim, lon_dim;
+    int err = nc_inq_dimlen(file->file_id, file->lat_id, &lat_dim);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_read_latlon_surface_var: Error getting lat dimension %s", nc_strerror(err));
+    err = nc_inq_dimlen(file->file_id, file->lon_id, &lon_dim);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_read_latlon_surface_var: Error getting lon dimension %s", nc_strerror(err));
+
+    size_t startp[3] = {time_index, 0, 0};
+    size_t countp[3] = {1, lat_dim, lon_dim};
+    err = nc_get_vara(file->file_id, var_id, startp, countp, var_data);
+    if (err != NC_NOERR)
+      polymec_error("cf_file_read_latlon_surface_var: Error writing data for var %s: %s", var_name, nc_strerror(err));
   }
 }
 
