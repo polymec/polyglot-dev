@@ -174,17 +174,18 @@ void cf_file_get_time_metadata(cf_file_t* file,
 int cf_file_set_time(cf_file_t* file, real_t t);
 
 // Defines a (3D) variable that is defined on the points of a lat-lon grid, 
-// setting up metadata like short and long names and units.
+// setting up metadata like short and long names and units. If the variable 
+// is time-dependent, its dimensions will be (time, vertical, lat, lon); 
+// otherwise they will be (vertical, lat, lon).
 void cf_file_define_latlon_var(cf_file_t* file, 
                                const char* var_name,
+                               bool time_dependent,
                                const char* short_name,
                                const char* long_name,
                                const char* units);
 
 // Fetches metadata for the given lat-lon variable. All strings must 
-// be large enough to hold POLYGLOT_CF_MAX_NAME+1 characters. The variable has
-// dimensions (vertical, lat, lon) if there is no time series, and 
-// (time, vertical, lat, lon) if there is.
+// be large enough to hold POLYGLOT_CF_MAX_NAME+1 characters. 
 void cf_file_get_latlon_var_metadata(cf_file_t* file, 
                                      const char* var_name,
                                      char* short_name,
@@ -198,7 +199,7 @@ bool cf_file_has_latlon_var(cf_file_t* file,
 
 // Writes a variable that is defined on the points of a lat-lon grid, 
 // specifying a time index that associates this entry with a given time. This 
-// time index is ignored if the file has no time series.
+// time index is ignored if the variable is not time dependent.
 void cf_file_write_latlon_var(cf_file_t* file, 
                               const char* var_name,
                               int time_index, 
@@ -213,17 +214,18 @@ void cf_file_read_latlon_var(cf_file_t* file,
                              real_t* var_data);
 
 // Defines a 2D surface variable that is defined on the points of a lat-lon 
-// grid, setting up metadata like short and long names and units.
+// grid, setting up metadata like short and long names and units. If the 
+// variable is time-dependent, its dimensions will be (time, lat, lon); 
+// otherwise they will be (lat, lon).
 void cf_file_define_latlon_surface_var(cf_file_t* file, 
                                        const char* var_name,
+                                       bool time_dependent,
                                        const char* short_name,
                                        const char* long_name,
                                        const char* units);
 
 // Fetches metadata for the given lat-lon surface variable. All strings must 
-// be large enough to hold POLYGLOT_CF_MAX_NAME+1 characters. The variable has
-// dimensions (lat, lon) if there is no time series, and 
-// (time, lat, lon) if there is.
+// be large enough to hold POLYGLOT_CF_MAX_NAME+1 characters. 
 void cf_file_get_latlon_surface_var_metadata(cf_file_t* file, 
                                              const char* var_name,
                                              char* short_name,
@@ -237,7 +239,7 @@ bool cf_file_has_latlon_surface_var(cf_file_t* file,
 
 // Writes a surface variable that is defined on the points of a lat-lon grid, 
 // specifying a time index that associates this entry with a given time. This 
-// time index is ignored if the file has no time series.
+// time index is ignored if the variable is not time-dependent.
 void cf_file_write_latlon_surface_var(cf_file_t* file, 
                                       const char* var_name,
                                       int time_index, 
@@ -245,7 +247,7 @@ void cf_file_write_latlon_surface_var(cf_file_t* file,
 
 // Reads a variable that is defined on the surface of a lat-lon grid, 
 // specifying an index for the time at which the data will be read. This 
-// time index is ignored if the file has no time series.
+// time index is ignored if the variable is not time-dependent.
 void cf_file_read_latlon_surface_var(cf_file_t* file, 
                                      const char* var_name,
                                      int time_index, 
