@@ -2,5 +2,6 @@
 # not modify it!
 include(polymec)
 set(POLYGLOT_LIBRARIES "@POLYGLOT_LIBRARIES@")
+set(POLYGLOT_VERSION "@POLYGLOT_VERSION@")
 include_directories("@CMAKE_INSTALL_PREFIX@/include/polyglot")
 
