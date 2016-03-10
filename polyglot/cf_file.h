@@ -102,7 +102,7 @@ void cf_file_define_dimension(cf_file_t* file,
 // "unlimited" dimension.
 int cf_file_dimension(cf_file_t* file, const char* dimension_name);
 
-// Sets up the data for a latitude/longitude grid with the given number 
+// Sets up the metadata for a latitude/longitude grid with the given number 
 // of latitudinal/longitudinal/vertical grid points and units of measure.
 // Possible units of measure are:
 //   latitude: degree_north, degree_N, degrees_N, degreeN, degreesN
@@ -113,13 +113,10 @@ int cf_file_dimension(cf_file_t* file, const char* dimension_name);
 // Additionally, an orientiation (vertical_orientation, "up" or "down") must 
 // be specified.
 void cf_file_define_latlon_grid(cf_file_t* file,
-                                real_t* latitude_points,
                                 int num_latitude_points,
                                 const char* latitude_units,
-                                real_t* longitude_points,
                                 int num_longitude_points,
                                 const char* longitude_units,
-                                real_t* vertical_points,
                                 int num_vertical_points,
                                 const char* vertical_units,
                                 const char* vertical_orientation);
@@ -137,13 +134,6 @@ void cf_file_get_latlon_grid_metadata(cf_file_t* file,
                                       int* num_vertical_points,
                                       char* vertical_units,
                                       char* vertical_orientation);
-
-// Fetches latitude/longitude/vertical grid points to the given arrays, which 
-// must be large enough to fit them.
-void cf_file_get_latlon_points(cf_file_t* file,
-                               real_t* latitude_points,
-                               real_t* longitude_points,
-                               real_t* vertical_points);
 
 // Sets up the time series variable within the CF file, specifying units and 
 // a calendar to use. Available units are:
@@ -169,10 +159,6 @@ void cf_file_get_time_metadata(cf_file_t* file,
                                char* time_units,
                                char* calendar);
 
-// Sets the time with which calls following this one will be associated. Returns 
-// an integer index identifying the given time.
-int cf_file_set_time(cf_file_t* file, real_t t);
-
 // Defines a (3D) variable that is defined on the points of a lat-lon grid, 
 // setting up metadata like short and long names and units. If the variable 
 // is time-dependent, its dimensions will be (time, vertical, lat, lon); 
@@ -197,22 +183,6 @@ void cf_file_get_latlon_var_metadata(cf_file_t* file,
 bool cf_file_has_latlon_var(cf_file_t* file,
                             const char* var_name);
 
-// Writes a variable that is defined on the points of a lat-lon grid, 
-// specifying a time index that associates this entry with a given time. This 
-// time index is ignored if the variable is not time dependent.
-void cf_file_write_latlon_var(cf_file_t* file, 
-                              const char* var_name,
-                              int time_index, 
-                              real_t* var_data);
-
-// Reads a variable that is defined on the points of a lat-lon grid, 
-// specifying an index for the time at which the data will be read. This 
-// time index is ignored if the file has no time series.
-void cf_file_read_latlon_var(cf_file_t* file, 
-                             const char* var_name,
-                             int time_index, 
-                             real_t* var_data);
-
 // Defines a 2D surface variable that is defined on the points of a lat-lon 
 // grid, setting up metadata like short and long names and units. If the 
 // variable is time-dependent, its dimensions will be (time, lat, lon); 
@@ -236,6 +206,39 @@ void cf_file_get_latlon_surface_var_metadata(cf_file_t* file,
 // false otherwise.
 bool cf_file_has_latlon_surface_var(cf_file_t* file,
                                     const char* var_name);
+
+// Writes the grid's coordinate data to the file.
+void cf_file_write_latlon_grid(cf_file_t* file,
+                               real_t* latitude_points,
+                               real_t* longitude_points,
+                               real_t* vertical_points);
+
+// Fetches latitude/longitude/vertical grid points to the given arrays, which 
+// must be large enough to fit them.
+void cf_file_read_latlon_grid(cf_file_t* file,
+                              real_t* latitude_points,
+                              real_t* longitude_points,
+                              real_t* vertical_points);
+
+// Appends a time to the time series in the grid, returning
+// an integer index identifying that time.
+int cf_file_append_time(cf_file_t* file, real_t t);
+
+// Writes a variable that is defined on the points of a lat-lon grid, 
+// specifying a time index that associates this entry with a given time. This 
+// time index is ignored if the variable is not time dependent.
+void cf_file_write_latlon_var(cf_file_t* file, 
+                              const char* var_name,
+                              int time_index, 
+                              real_t* var_data);
+
+// Reads a variable that is defined on the points of a lat-lon grid, 
+// specifying an index for the time at which the data will be read. This 
+// time index is ignored if the file has no time series.
+void cf_file_read_latlon_var(cf_file_t* file, 
+                             const char* var_name,
+                             int time_index, 
+                             real_t* var_data);
 
 // Writes a surface variable that is defined on the points of a lat-lon grid, 
 // specifying a time index that associates this entry with a given time. This 

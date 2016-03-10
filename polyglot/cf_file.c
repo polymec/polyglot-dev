@@ -59,7 +59,7 @@ static void put_attribute(int file_id,
                           const char* attr,
                           const char* value)
 {
-  int err = nc_put_att_text(file_id, var_id, attr, 1, value);
+  int err = nc_put_att_text(file_id, var_id, attr, strlen(value), value);
   if (err != NC_NOERR)
   {
     polymec_error("cf_file: Error setting attribute %s: %s", 
@@ -149,8 +149,13 @@ void find_vertical_coordinate(int file_id, int* lev_id, int* lev_dim, char* lev_
     char positive[POLYGLOT_CF_MAX_NAME+1];
     get_first_attribute(file_id, var_id, "positive", positive);
     if ((strlen(positive) > 0) &&
-        (string_casecmp(positive, "up") != 0) && 
-        (string_casecmp(positive, "down") != 0)) continue;
+        ((string_casecmp(positive, "up") == 0) || 
+         (string_casecmp(positive, "down") == 0)))
+    {
+      *lev_id = var_id;
+      strcpy(lev_name, var_name);
+      return;
+    }
 
     // If we didn't find a positive attribute, see whether the units 
     // indicate a pressure.
@@ -176,7 +181,7 @@ void find_vertical_coordinate(int file_id, int* lev_id, int* lev_dim, char* lev_
 cf_file_t* cf_file_new(const char* filename)
 {
   int file_id;
-  int err = nc_open(filename, NC_WRITE, &file_id);
+  int err = nc_create(filename, NC_CLOBBER | NC_NETCDF4, &file_id);
   if (err != NC_NOERR)
     polymec_error("cf_file_new: Couldn't open file %s: %s", filename, nc_strerror(err));
 
@@ -200,7 +205,7 @@ cf_file_t* cf_file_new(const char* filename)
   char conventions[NC_MAX_NAME+1];
   snprintf(conventions, NC_MAX_NAME, "CF-%d.%d.%d", cf->cf_major_version, 
            cf->cf_minor_version, cf->cf_patch_version);
-  err = nc_put_att_text(cf->file_id, NC_GLOBAL, "Conventions", 1, conventions);
+  err = nc_put_att_text(cf->file_id, NC_GLOBAL, "Conventions", strlen(conventions), conventions);
   if (err != NC_NOERR)
     polymec_error("cf_file_new: Couldn't write Conventions attribute: %s", nc_strerror(err));
 
@@ -332,7 +337,9 @@ cf_file_t* cf_file_open(const char* filename)
 
 void cf_file_close(cf_file_t* file)
 {
-  nc_close(file->file_id);
+  int err = nc_close(file->file_id);
+  if (err != NC_NOERR)
+    polymec_error("Error closing CF file.", nc_strerror(err));
   string_int_unordered_map_free(file->ll_vars);
   string_int_unordered_map_free(file->td_ll_vars);
   string_int_unordered_map_free(file->ll_surface_vars);
@@ -434,13 +441,10 @@ int cf_file_dimension(cf_file_t* file, const char* dimension_name)
 }
 
 void cf_file_define_latlon_grid(cf_file_t* file,
-                                real_t* latitude_points,
                                 int num_latitude_points,
                                 const char* latitude_units,
-                                real_t* longitude_points,
                                 int num_longitude_points,
                                 const char* longitude_units,
-                                real_t* vertical_points,
                                 int num_vertical_points,
                                 const char* vertical_units,
                                 const char* vertical_orientation)
@@ -450,6 +454,32 @@ void cf_file_define_latlon_grid(cf_file_t* file,
   ASSERT(num_longitude_points > 0);
   ASSERT(num_vertical_points > 0);
 
+  // Validate units and orientation.
+  const char* valid_lat_units[] = {"degree_north", "degree_N", "degrees_N",
+                                   "degreeN", "degreesN", NULL};
+  int index = string_find_in_list(latitude_units, valid_lat_units, true);
+  if (index == -1)
+    polymec_error("cf_file_define_latlon_grid: Invalid latitude units: %s", latitude_units);
+
+  const char* valid_lon_units[] = {"degree_east", "degree_E", "degrees_E",
+                                   "degreeE", "degreesE", NULL};
+  index = string_find_in_list(longitude_units, valid_lon_units, true);
+  if (index == -1)
+    polymec_error("cf_file_define_latlon_grid: Invalid longitude units: %s", longitude_units);
+
+  const char* valid_vert_units[] = {"bar", "millibar", "decibar",
+                                    "atmosphere", "atm", "pascal", "Pa", "hPa", 
+                                    "meter", "metre", "m", "kilometer", "km", 
+                                    "level", "sigma_level", NULL};
+  index = string_find_in_list(vertical_units, valid_vert_units, true);
+  if (index == -1)
+    polymec_error("cf_file_define_latlon_grid: Invalid vertical units: %s", vertical_units);
+
+  const char* valid_vert_orientation[] = {"up", "down", NULL};
+  index = string_find_in_list(vertical_orientation, valid_vert_orientation, false);
+  if (index == -1)
+    polymec_error("cf_file_define_latlon_grid: Invalid vertical orientation: %s", vertical_orientation);
+
   // Latitude dimension, data, metadata.
   int err = nc_def_dim(file->file_id, "lat", num_latitude_points, &file->lat_dim);
   if (err != NC_NOERR)
@@ -457,9 +487,6 @@ void cf_file_define_latlon_grid(cf_file_t* file,
   err = nc_def_var(file->file_id, "lat", NC_REAL, 1, &file->lat_dim, &file->lat_id);
   if (err != NC_NOERR)
     polymec_error("cf_file_define_latlon_grid: Could not define lat variable: %s", nc_strerror(err));
-  err = nc_put_var(file->file_id, file->lat_id, latitude_points);
-  if (err != NC_NOERR)
-    polymec_error("cf_file_define_latlon_grid: Could not set lat data: %s", nc_strerror(err));
   put_attribute(file->file_id, file->lat_id, "long_name", "latitude");
   put_attribute(file->file_id, file->lat_id, "standard_name", "latitude");
   put_attribute(file->file_id, file->lat_id, "units", latitude_units);
@@ -472,9 +499,6 @@ void cf_file_define_latlon_grid(cf_file_t* file,
   err = nc_def_var(file->file_id, "lon", NC_REAL, 1, &file->lon_dim, &file->lon_id);
   if (err != NC_NOERR)
     polymec_error("cf_file_define_latlon_grid: Could not define lon variable: %s", nc_strerror(err));
-  err = nc_put_var(file->file_id, file->lon_id, longitude_points);
-  if (err != NC_NOERR)
-    polymec_error("cf_file_define_latlon_grid: Could not set lon data: %s", nc_strerror(err));
   put_attribute(file->file_id, file->lon_id, "long_name", "longitude");
   put_attribute(file->file_id, file->lon_id, "standard_name", "longitude");
   put_attribute(file->file_id, file->lon_id, "units", longitude_units);
@@ -487,15 +511,29 @@ void cf_file_define_latlon_grid(cf_file_t* file,
   err = nc_def_var(file->file_id, file->lev_name, NC_REAL, 1, &file->lev_dim, &file->lev_id);
   if (err != NC_NOERR)
     polymec_error("cf_file_define_latlon_grid: Could not define lev variable: %s", nc_strerror(err));
-  err = nc_put_var(file->file_id, file->lev_id, vertical_points);
-  if (err != NC_NOERR)
-    polymec_error("cf_file_define_latlon_grid: Could not set lev data: %s", nc_strerror(err));
-  put_attribute(file->file_id, file->lev_id, "long_name", "longitude");
-  put_attribute(file->file_id, file->lev_id, "standard_name", "longitude");
+//  put_attribute(file->file_id, file->lev_id, "long_name", "longitude");
+//  put_attribute(file->file_id, file->lev_id, "standard_name", "longitude");
   put_attribute(file->file_id, file->lev_id, "units", vertical_units);
   put_attribute(file->file_id, file->lev_id, "positive", vertical_orientation);
   put_attribute(file->file_id, file->lev_id, "axis", "Z");
   file->nlev = num_vertical_points;
+}
+
+void cf_file_write_latlon_grid(cf_file_t* file,
+                               real_t* latitude_points,
+                               real_t* longitude_points,
+                               real_t* vertical_points)
+{
+  int err = nc_put_var(file->file_id, file->lat_id, latitude_points);
+  if (err != NC_NOERR)
+    polymec_error("cf_file_write_latlon_grid: Could not set lat data: %s", nc_strerror(err));
+  err = nc_put_var(file->file_id, file->lon_id, longitude_points);
+  if (err != NC_NOERR)
+    polymec_error("cf_file_write_latlon_grid: Could not set lon data: %s", nc_strerror(err));
+  err = nc_put_var(file->file_id, file->lev_id, vertical_points);
+  if (err != NC_NOERR)
+    polymec_error("cf_file_write_latlon_grid: Could not set lev data: %s", nc_strerror(err));
+
 }
 
 bool cf_file_has_latlon_grid(cf_file_t* file)
@@ -528,10 +566,10 @@ void cf_file_get_latlon_grid_metadata(cf_file_t* file,
   get_first_attribute(file->file_id, file->lev_id, "positive", vertical_orientation);
 }
 
-void cf_file_get_latlon_points(cf_file_t* file,
-                               real_t* latitude_points,
-                               real_t* longitude_points,
-                               real_t* vertical_points)
+void cf_file_read_latlon_grid(cf_file_t* file,
+                              real_t* latitude_points,
+                              real_t* longitude_points,
+                              real_t* vertical_points)
 {
   ASSERT(cf_file_has_latlon_grid(file));
 
