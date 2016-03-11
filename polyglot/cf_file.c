@@ -174,6 +174,7 @@ void find_vertical_coordinate(int file_id, int* lev_id, int* lev_dim, char* lev_
       return;
     }
   }
+  polymec_error("Could not identify vertical coordinate from file metadata.");
 }
 
 // Implementation.
@@ -511,8 +512,6 @@ void cf_file_define_latlon_grid(cf_file_t* file,
   err = nc_def_var(file->file_id, file->lev_name, NC_REAL, 1, &file->lev_dim, &file->lev_id);
   if (err != NC_NOERR)
     polymec_error("cf_file_define_latlon_grid: Could not define lev variable: %s", nc_strerror(err));
-//  put_attribute(file->file_id, file->lev_id, "long_name", "longitude");
-//  put_attribute(file->file_id, file->lev_id, "standard_name", "longitude");
   put_attribute(file->file_id, file->lev_id, "units", vertical_units);
   put_attribute(file->file_id, file->lev_id, "positive", vertical_orientation);
   put_attribute(file->file_id, file->lev_id, "axis", "Z");
