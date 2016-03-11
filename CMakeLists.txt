@@ -55,6 +55,7 @@ add_custom_target(generate_top_header ALL
                   
 # Build 3rd-party libraries.
 add_subdirectory(3rdparty)
+link_directories("${PROJECT_BINARY_DIR}/lib")
 
 enable_testing()
 
