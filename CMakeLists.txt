@@ -54,8 +54,8 @@ add_custom_target(generate_top_header ALL
                   python ${PROJECT_SOURCE_DIR}/tools/generate_top_header.py ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR}/include)
                   
 # Build 3rd-party libraries.
-add_subdirectory(3rdparty)
 link_directories("${PROJECT_BINARY_DIR}/lib")
+add_subdirectory(3rdparty)
 
 enable_testing()
 
