@@ -37,7 +37,19 @@ static void get_first_attribute(int file_id,
                                 const char* attr,
                                 char* value)
 {
-  int err = nc_get_att_text(file_id, var_id, attr, value);
+  size_t len;
+  int err = nc_inq_attlen(file_id, var_id, attr, &len);
+  if (err == NC_ENOTATT)
+  {
+    value[0] = '\0';
+    return;
+  }
+  else if (err != NC_NOERR)
+  {
+    polymec_error("cf_file: Error retrieving attribute %s length: %s", 
+                  attr, nc_strerror(err));
+  }
+  err = nc_get_att_text(file_id, var_id, attr, value);
   if (err == NC_ENOTATT)
     value[0] = '\0';
   else if (err != NC_NOERR)
@@ -45,6 +57,7 @@ static void get_first_attribute(int file_id,
     polymec_error("cf_file: Error retrieving attribute %s: %s", 
                   attr, nc_strerror(err));
   }
+  value[len] = '\0';
 }
 
 static void get_first_global_attribute(int file_id,
