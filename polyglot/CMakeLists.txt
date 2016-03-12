@@ -6,9 +6,11 @@ set(POLYGLOT_SOURCES polyglot.c import_tetgen_mesh.c
 if (HAVE_POLYAMRI)
   include(add_polyamri_library)
   add_polyamri_library(polyglot ${POLYGLOT_SOURCES})
+  target_link_libraries(polyglot exodus;netcdf)
 else()
   include(add_polymec_library)
   add_polymec_library(polyglot ${POLYGLOT_SOURCES})
+  target_link_libraries(polyglot exodus;netcdf)
 endif()
 add_dependencies(polyglot update_version_h) # <-- needed on Mac(?!)
 
