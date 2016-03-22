@@ -12,10 +12,11 @@
 #include "polyglot/polyglot.h"
 #include "polyglot/polyglot_version.h"
 
+#if POLYGLOT_MAJOR_VERSION > 0
+
 #if POLYMEC_MAJOR_VERSION != POLYGLOT_MAJOR_VERSION
 #error "The installed major version of polymec differs from that of polyglot. Please make sure these versions match."
 #endif
-#if POLYMEC_MINOR_VERSION != POLYGLOT_MINOR_VERSION
-#error "The installed minor version of polymec differs from that of polyglot. Please make sure these versions match."
+
 #endif
 
