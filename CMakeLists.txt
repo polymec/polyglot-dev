@@ -3,8 +3,8 @@ cmake_minimum_required (VERSION 2.8.5)
 
 # Project and version numbers.
 project (polyglot)
-set (POLYGLOT_MAJOR_VERSION 0)
-set (POLYGLOT_MINOR_VERSION 7)
+set (POLYGLOT_MAJOR_VERSION 1)
+set (POLYGLOT_MINOR_VERSION 0)
 set (POLYGLOT_PATCH_VERSION 0)
 set (POLYGLOT_VERSION "${POLYGLOT_MAJOR_VERSION}.${POLYGLOT_MINOR_VERSION}.${POLYGLOT_PATCH_VERSION}")
 message("-- Building polyglot (v${POLYGLOT_VERSION})")
