@@ -545,8 +545,8 @@ mesh_t* import_tetgen_mesh(MPI_Comm comm,
   }
 
   // Partition the mesh (without weights).
-  exchanger_t* distributor = partition_mesh(&mesh, comm, NULL, 0.05);
-  exchanger_free(distributor);
+  migrator_t* distributor = partition_mesh(&mesh, comm, NULL, 0.05);
+  migrator_free(distributor);
   
   mesh_add_feature(mesh, MESH_IS_TETRAHEDRAL);
   return mesh;
