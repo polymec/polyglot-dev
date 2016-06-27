@@ -28,13 +28,21 @@ man_MANS = ncdump.1 nccopy.1
 if BUILD_TESTSETS
 #if !BUILD_DLL
 # These tests are run for both netCDF-4 and non-netCDF-4 builds.
-check_PROGRAMS = rewrite-scalar ctest ctest64 ncdump tst_utf8 bom
-TESTS = run_tests.sh tst_64bit.sh ctest ctest64 tst_output.sh	\
+check_PROGRAMS = rewrite-scalar ctest ctest64 ncdump tst_utf8 bom tst_dimsizes
+TESTS = tst_inttags.sh run_tests.sh tst_64bit.sh ctest ctest64 tst_output.sh	\
 tst_lengths.sh tst_calendars.sh tst_utf8 run_utf8_tests.sh      \
-tst_nccopy3.sh tst_charfill.sh tst_iter.sh tst_formatx3.sh tst_bom.sh
+tst_nccopy3.sh tst_charfill.sh tst_iter.sh tst_formatx3.sh tst_bom.sh \
+tst_dimsizes.sh
 
 if LARGE_FILE_TESTS
 TESTS += tst_iter.sh
+endif
+
+if BUILD_DISKLESS
+TESTS += tst_inmemory_nc3.sh
+if USE_NETCDF4
+TESTS += tst_inmemory_nc4.sh
+endif
 endif
 
 if USE_NETCDF4
@@ -44,12 +52,12 @@ tst_enum_data tst_opaque_data tst_string_data tst_vlen_data tst_comp	\
 tst_comp2 tst_nans tst_special_atts tst_unicode tst_fillbug tst_compress \
 tst_chunking tst_h_scalar tst_bug324
 
-TESTS += tst_create_files tst_group_data tst_enum_data tst_opaque_data	\
+TESTS += tst_inttags4.sh tst_create_files tst_group_data tst_enum_data tst_opaque_data	\
 tst_string_data tst_vlen_data tst_comp tst_comp2 tst_nans		\
 tst_special_atts tst_netcdf4.sh tst_h_rdc0 tst_unicode tst_fillbug	\
 tst_fillbug.sh tst_netcdf4_4.sh tst_compress tst_nccopy4.sh             \
 tst_grp_spec.sh tst_mud.sh tst_h_scalar tst_h_scalar.sh tst_formatx4.sh \
-tst_bug324
+tst_bug324 run_utf8_nc4_tests.sh
 
 if EXTRA_TESTS
 TESTS += run_back_comp_tests.sh
@@ -64,16 +72,16 @@ endif #!USE_NETCDF4
 BUILT_SOURCES = ctest.c ctest64.c
 if EXTRA_TESTS
 ctest.c:
-	$(top_builddir)/ncgen/ncgen -lc -o ctest0.nc $(top_srcdir)/ncgen/c0.cdl >$(srcdir)/ctest.c
+	$(top_builddir)/ncgen/ncgen -lc -o ctest0.nc $(top_srcdir)/ncgen/c0.cdl > $(top_builddir)/ncdump/ctest.c
 
 ctest64.c:
-	$(top_builddir)/ncgen/ncgen -v2 -lc -o ctest0_64.nc $(top_srcdir)/ncgen/c0.cdl > $(srcdir)/ctest64.c
+	$(top_builddir)/ncgen/ncgen -k2 -lc -o ctest0_64.nc $(top_srcdir)/ncgen/c0.cdl > $(srcdir)/ctest64.c
 else
 ctest.c:
-	cp $(top_srcdir)/ncdump/ref_ctest.c $(top_srcdir)/ncdump/ctest.c
+	cp $(top_srcdir)/ncdump/ref_ctest.c $(top_builddir)/ncdump/ctest.c
 
 ctest64.c:
-	cp $(top_srcdir)/ncdump/ref_ctest64.c $(top_srcdir)/ncdump/ctest64.c
+	cp $(top_srcdir)/ncdump/ref_ctest64.c $(top_builddir)/ncdump/ctest64.c
 endif
 
 #if !BUILD_DLL
@@ -102,9 +110,11 @@ tst_vlen_data.cdl tst_solar_1.cdl tst_format_att.cdl tst_inflated.nc    \
 tmp_subset.cdl tst_inflated4.nc tst_deflated.nc tst_chunking.nc tmp*.nc \
 tst_charfill.nc tmp_tst_charfill.cdl \
 iter.* \
-tst_nc_test_netcdf4_4_0.cdl tst_mud4.nc tst_mud4.cdl tst_mud4-bc.cdl \
-tst_ncf213.cdl tst_ncf213.nc tst_h_scalar.cdl tst_h_scalar.nc \
-tst_mud4_chars.cdl tst_mud4_chars.nc
+tst_nc_test_netcdf4_4_0.cdl tst_mud4.nc tst_mud4.cdl tst_mud4-bc.cdl    \
+tst_ncf213.cdl tst_ncf213.nc tst_h_scalar.cdl tst_h_scalar.nc           \
+tst_mud4_chars.cdl tst_mud4_chars.nc                                    \
+inttags.nc inttags4.nc tst_inttags.cdl tst_inttags4.cdl                 \
+tst_dimsize_classic.nc tst_dimsize_64offset.nc tst_dimsize_64data.nc
 
 # These files all have to be included with the distribution.
 EXTRA_DIST = run_tests.sh tst_64bit.sh tst_output.sh test0.cdl		\
@@ -125,16 +135,19 @@ ref_nc_test_netcdf4.cdl ref_tst_special_atts3.cdl tst_brecs.cdl         \
 ref_tst_grp_spec0.cdl ref_tst_grp_spec.cdl tst_grp_spec.sh              \
 ref_tst_charfill.cdl tst_charfill.cdl tst_charfill.sh                   \
 tst_iter.sh tst_mud.sh ref_tst_mud4.cdl ref_tst_mud4-bc.cdl             \
-ref_tst_mud4_chars.cdl \
+ref_tst_mud4_chars.cdl                                                  \
+inttags.cdl inttags4.cdl ref_inttags.cdl ref_inttags4.cdl               \
 ref_tst_ncf213.cdl tst_h_scalar.sh                                      \
-tst_formatx3.sh tst_formatx4.sh                                         \
-CMakeLists.txt XGetopt.c tst_bom.sh
+run_utf8_nc4_tests.sh							\
+tst_formatx3.sh tst_formatx4.sh ref_tst_utf8_4.cdl                      \
+tst_inttags.sh tst_inttags4.sh                                          \
+CMakeLists.txt XGetopt.c tst_bom.sh tst_inmemory_nc3.sh                 \
+tst_dimsizes.sh tst_inmemory_nc4.sh
 
 # CDL files and Expected results
 SUBDIRS=cdl expected
 EXTRA_DIST += tst_ncgen_shared.sh tst_ncgen4.sh tst_ncgen4_classic.sh	\
-tst_ncgen4_diff.sh tst_ncgen4_cycle.sh ref_ctest.c ref_ctest64.c \
-ctest.c ctest64.c
+tst_ncgen4_diff.sh tst_ncgen4_cycle.sh ref_ctest.c ref_ctest64.c
 
 CLEANFILES += results/*.nc results/*.dmp results/*.dmp2 tmp*.cdl tst_bug324.nc
 DISTCLEANFILES = results

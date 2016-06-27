@@ -593,7 +593,7 @@ test_ncattget(path)
     }
     /* try getting non-existent attribute, should fail */
     if (ncattget(cdfid, uu_id, "nonesuch", vmax.val) != -1) {
-	error("%s: ncattget should fail with nonexistant attribute", pname);
+	error("%s: ncattget should fail with nonexistent attribute", pname);
 	ncclose(cdfid); return ++nerrs;
     }
     if (ncclose (cdfid) == -1) {
@@ -1293,7 +1293,7 @@ test_ncattdel(path)
 	error("%s: ncinquire in data mode failed", pname);
 	ncclose(cdfid); return ++nerrs;
     }
-    vtmp.dims = (int *) emalloc(sizeof(int) * MAX_VAR_DIMS);
+    vtmp.dims = (int *) emalloc(sizeof(int) * NC_MAX_VAR_DIMS);
     vtmp.name = (char *) emalloc(MAX_NC_NAME);
     if (ncvarinq(cdfid, yav_id, vtmp.name, &vtmp.type, &vtmp.ndims, vtmp.dims,
 		  &natts) == -1) {

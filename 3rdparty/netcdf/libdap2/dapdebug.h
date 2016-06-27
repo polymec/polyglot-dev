@@ -72,4 +72,3 @@ extern int dapthrow(int err);
 #define LOG2(level,msg,a1,a2) nclog(level,msg,a1,a2)
 
 #endif /*DEBUG_H*/
-

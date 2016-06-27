@@ -15,12 +15,12 @@ AC_REVISION([$Id: configure.ac,v 1.450 2010/05/28 19:42:47 dmh Exp $])
 AC_PREREQ([2.59])
 
 # Initialize with name, version, and support email address.
-AC_INIT([netCDF], [4.3.3.1], [support-netcdf@unidata.ucar.edu])
+AC_INIT([netCDF], [4.4.0], [support-netcdf@unidata.ucar.edu])
 
 AC_SUBST([NC_VERSION_MAJOR]) NC_VERSION_MAJOR=4
-AC_SUBST([NC_VERSION_MINOR]) NC_VERSION_MINOR=3
-AC_SUBST([NC_VERSION_PATCH]) NC_VERSION_PATCH=3
-AC_SUBST([NC_VERSION_NOTE]) NC_VERSION_NOTE=".1"
+AC_SUBST([NC_VERSION_MINOR]) NC_VERSION_MINOR=4
+AC_SUBST([NC_VERSION_PATCH]) NC_VERSION_PATCH=0
+AC_SUBST([NC_VERSION_NOTE]) NC_VERSION_NOTE=""
 
 #####
 # Set some variables used to generate a libnetcdf.settings file,
@@ -80,11 +80,47 @@ AC_ARG_WITH([minblocksize],
 AC_MSG_RESULT([$NCIO_MINBLOCKSIZE])
 AC_DEFINE_UNQUOTED([NCIO_MINBLOCKSIZE], [$NCIO_MINBLOCKSIZE], [min blocksize for posixio.])
 
+###
+# Doxygen and doxygen-related options.
+###
 AC_ARG_ENABLE([doxygen],
   [AS_HELP_STRING([--enable-doxygen],
     [Enable generation of documentation.])])
 test "x$enable_doxygen" = xyes || enable_doxygen=no
 AM_CONDITIONAL([BUILD_DOCS], [test "x$enable_doxygen" = xyes])
+
+AC_ARG_ENABLE([doxygen-tasks],
+    [AS_HELP_STRING([--enable-doxygen-tasks],
+        [Enable Doxygen-generated test, todo and bug list documentation. Developers only.])])
+test "x$enable_doxygen_tasks" = xyes || enable_doxygen_tasks=no
+AM_CONDITIONAL([SHOW_DOXYGEN_TAG_LIST], [test "x$enable_doxygen_tasks" = xyes])
+AC_SUBST([SHOW_DOXYGEN_TAG_LIST], [$enable_doxygen_tasks])
+
+###
+# Determine if we should build documentation
+# configured for releases on the Unidata web server.
+###
+AC_ARG_ENABLE([doxygen-build-release-docs],
+    [AS_HELP_STRING([--enable-doxygen-build-release-docs],
+        [Build release documentation.  This is of interest only to developers.])])
+test "x$enable_doxygen_build_release_docs" = xyes || enable_doxygen_build_release_docs=no
+AM_CONDITIONAL([DOXYGEN_BUILD_RELEASE_DOCS], [test "x$enable_doxygen_build_release_docs" = xyes])
+
+if test $enable_doxygen_build_release_docs = yes; then
+   AC_SUBST([DOXYGEN_CSS_FILE], ["release.css"])
+   AC_SUBST([DOXYGEN_HEADER_FILE], ["release_header.html"])
+   AC_SUBST([DOXYGEN_SEARCHENGINE], ["NO"])
+else
+   AC_SUBST([DOXYGEN_CSS_FILE], [])
+   AC_SUBST([DOXYGEN_HEADER_FILE], [])
+   AC_SUBST([DOXYGEN_SEARCHENGINE], ["YES"])
+fi
+
+AC_ARG_ENABLE([doxygen-pdf-output],
+    [AS_HELP_STRING([--enable-doxygen-pdf-output],
+        [Build netCDF library documentation in PDF format. Experimental.])])
+               AM_CONDITIONAL([NC_ENABLE_DOXYGEN_PDF_OUTPUT], [test "x$enable_doxygen_pdf_output" = xyes])
+AC_SUBST([NC_ENABLE_DOXYGEN_PDF_OUTPUT], [$enable_doxygen_pdf_output])
 
 AC_ARG_ENABLE([dot],
 	[AS_HELP_STRING([--enable-dot],
@@ -132,19 +168,19 @@ test "x$enable_valgrind_tests" = xyes || enable_valgrind_tests=no
 AC_MSG_RESULT($enable_valgrind_tests)
 
 # Does the user want to build netcdf-4?
-AC_MSG_CHECKING([whether we should try to build netCDF-4])
-AC_ARG_ENABLE([netcdf-4], [AS_HELP_STRING([--enable-netcdf-4],
-              [build with netcdf-4 (HDF5 and zlib required)])])
+AC_MSG_CHECKING([whether we should build netCDF-4])
+AC_ARG_ENABLE([netcdf-4], [AS_HELP_STRING([--disable-netcdf-4],
+              [do not build with netcdf-4 (else HDF5 and zlib required)])])
 test "x$enable_netcdf_4" = xno || enable_netcdf_4=yes
-AC_MSG_RESULT([$enable_netcdf_4])
 
 # Synonym
-# --enable-netcdf-4 is the controlling enable switch
-if test "x$enable_netcdf_4" = "x" ; then
-  AC_ARG_ENABLE([netcdf4], [AS_HELP_STRING([--enable-netcdf4],
-              [(just a synonym for enable-netcdf-4)])])
-  enable_netcdf_4="$enable_netcdf4"
+AC_ARG_ENABLE([netcdf4], [AS_HELP_STRING([--disable-netcdf4],
+              [(just a synonym for --disable-netcdf-4)])])
+test "x$enable_netcdf4" = xno || enable_netcdf4=yesi
+if test "x$enable_netcdf4" = xno ; then
+enable_netcdf_4=no
 fi
+AC_MSG_RESULT([$enable_netcdf_4])
 
 # Does the user require dynamic loading?
 # This is only for those hdf5 installs that support it.
@@ -178,13 +214,6 @@ AC_ARG_ENABLE([fortran], [AS_HELP_STRING([--enable-remote-fortran-bootstrap],
 			 [Download and install netcdf-fortran (EXPERIMENTAL)])])
 test "x$enable_remote_fortran_bootstrap" = xyes || enable_remote_fortran_bootstrap=no
 AC_MSG_RESULT([$enable_remote_fortran_bootstrap])
-
-# Does the user want to turn on PNETCDF read ability?
-AC_MSG_CHECKING([whether parallel I/O for classic and 64-bit offset files using parallel-netcdf is to be enabled])
-AC_ARG_ENABLE([pnetcdf], [AS_HELP_STRING([--enable-pnetcdf],
-              [build with parallel I/O for classic and 64-bit offset files using parallel-netcdf])])
-test "x$enable_pnetcdf" = xyes || enable_pnetcdf=no
-AC_MSG_RESULT($enable_pnetcdf)
 
 # Does the user want to run extra example tests
 AC_MSG_CHECKING([whether extra example tests should be run])
@@ -269,16 +298,6 @@ AC_ARG_ENABLE([logging],
 test "x$enable_logging" = xyes || enable_logging=no
 AC_MSG_RESULT([$enable_logging])
 
-# Capture the state of the --enable-cdmremote flag
-AC_MSG_CHECKING([whether cdmremote client is to be built])
-AC_ARG_ENABLE([cdmremote],
-                 [AS_HELP_STRING([--enable-cdmremote],
-                                 [build with cdmremote client support.])])
-test "x$enable_cdmremote" = xyes || enable_cdmremote=no
-# CDMREMOTE requires netCDF-4
-if test "x$enable_netcdf_4" = "xno" ; then enable_cdmremote=no ; fi
-AC_MSG_RESULT($enable_cdmremote)
-
 ## Capture the state of the --enable-dap flag
 AC_MSG_CHECKING([whether DAP client is to be built])
 AC_ARG_ENABLE([dap],
@@ -287,21 +306,10 @@ AC_ARG_ENABLE([dap],
 test "x$enable_dap" = xno || enable_dap=yes
 AC_MSG_RESULT($enable_dap)
 
-# OC now has its own version of rpc (really xdr), so no longer need the library
-## Capture the state of the --enable-rpc flag
-#AC_MSG_CHECKING([whether rpc client and server are to be built])
-#AC_ARG_ENABLE([rpc],
-#                 [AS_HELP_STRING([--enable-rpc],
-#                                 [build with rpc client and server support.])])
-#test "x$enable_rpc" = xyes || enable_rpc=no
-#AC_MSG_RESULT($enable_rpc)
-
 # Curl support is required if and only if any of these flags are set:
 # 1. --enable-dap
-# 2. --enable-cdmremote
-# 3. --enable-rpc
 
-if test "x$enable_dap" = "xyes" -o "x$enable_cdmremote" = "xyes" -o "x$enable_rpc" = "xyes" ; then
+if test "x$enable_dap" = "xyes" ; then
 require_curl=yes
 else
 require_curl=no
@@ -320,8 +328,6 @@ if test $require_curl = yes ; then
   if test $found_curl = no ; then
     AC_MSG_NOTICE([libcurl not found; disabling remote protocol(s) support])
     enable_dap=no
-    enable_cdmremote=no
-    enable_rpc=no
   elif test $found_curl = yes ; then
     # Redo the check lib to actually add -lcurl
     #AC_CHECK_LIB([curl], [curl_easy_setopt])
@@ -381,14 +387,6 @@ if test "x$enable_dap_remote_tests" = xyes; then
    AC_DEFINE([ENABLE_DAP_REMOTE_TESTS], [1], [if true, do remote tests])
 fi
 
-if test "x$enable_cdmremote" = xyes; then
-   AC_DEFINE([USE_CDMREMOTE], [1], [if true, build CDMREMOTE Client])
-fi
-
-if test "x$enable_rpc" = xyes; then
-   AC_DEFINE([BUILD_RPC], [1], [if true, build RPC Client and Server])
-fi
-
 AC_MSG_CHECKING([whether the time-consuming dap tests should be enabled (default off)])
 AC_ARG_ENABLE([dap-long-tests],
               [AS_HELP_STRING([--enable-dap-long-tests],
@@ -405,8 +403,8 @@ AM_CONDITIONAL(INTERNAL_OCLIB,[test "x" = "x"])
 AC_MSG_CHECKING([whether netCDF extra tests should be run (developers only)])
 AC_ARG_ENABLE([extra-tests],
               [AS_HELP_STRING([--enable-extra-tests],
-                              [run some extra tests that may not pass because of known issues])])
-test "x$enable_extra_tests" = xyes || enable_extra_tests=no
+                              [enable some extra tests that may not pass because of known issues])])
+test "x$enable_extra_tests" = xno || enable_extra_tests=yes
 AC_MSG_RESULT($enable_extra_tests)
 if test "x$enable_extra_tests" = xyes; then
    AC_DEFINE([EXTRA_TESTS], [1], [if true, run extra tests which may not work yet])
@@ -424,6 +422,18 @@ if test "x$enable_ffio" = xyes; then
    AC_DEFINE([USE_FFIO], [1], [if true, use ffio instead of posixio])
 fi
 AM_CONDITIONAL(USE_FFIO, [test x$enable_ffio = xyes])
+
+# Does the user want to use the stdio module?
+AC_MSG_CHECKING([whether STDIO will be used])
+AC_ARG_ENABLE([stdio],
+              [AS_HELP_STRING([--enable-stdio],
+                              [use stdio instead of posixio (ex. on the Cray)])])
+test "x$enable_stdio" = xyes || enable_stdio=no
+AC_MSG_RESULT($enable_stdio)
+if test "x$enable_stdio" = xyes; then
+   AC_DEFINE([USE_STDIO], [1], [if true, use stdio instead of posixio])
+fi
+AM_CONDITIONAL(USE_STDIO, [test x$enable_stdio = xyes])
 
 # Does the user want to enable the user-provided NEC-SX vectorization
 # patch.
@@ -503,7 +513,7 @@ if test "x$enable_large_file_tests" = xyes; then
 fi
 
 # Does the user want to run benchmarks?
-AC_MSG_CHECKING([whether benchmaks should be run (experimental)])
+AC_MSG_CHECKING([whether benchmarks should be run (experimental)])
 AC_ARG_ENABLE([benchmarks],
               [AS_HELP_STRING([--enable-benchmarks],
                               [Run benchmarks. This is an experimental feature. You must fetch
@@ -750,16 +760,14 @@ AC_ARG_ENABLE([diskless],
               [AS_HELP_STRING([--disable-diskless],
                               [disable support for in-memory (NC_DISKLESS) files])])
 test "x$enable_diskless" = xno || enable_diskless=yes
-
-
-# Check for enable DAP
-if test "x$enable_dap" = "xyes" -o "x$enable_cdmremote" = "xyes" -o "x$enable_rpc" = "xyes" ; then
-enable_diskless=yes
-AC_MSG_NOTICE([--enable-dap requires --enable-diskless])
-fi
-
 AC_MSG_RESULT($enable_diskless)
 
+# Check for enable DAP
+if test "x$enable_dap" = "xyes"; then
+enable_diskless=yes
+AC_MSG_NOTICE([--enable-dap requires --enable-diskless])
+AC_MSG_NOTICE([dap support disabled])
+fi
 
 # check for useful, but not essential, memio support
 AC_CHECK_FUNCS([memmove getpagesize sysconf])
@@ -795,17 +803,72 @@ AC_STRUCT_ST_BLKSIZE
 UD_CHECK_IEEE
 AC_TYPE_SIZE_T
 AC_TYPE_OFF_T
-AC_CHECK_TYPES([ssize_t, ptrdiff_t, uchar, longlong])
+AC_CHECK_TYPES([size_t, ssize_t, ptrdiff_t, uchar, longlong, ushort, uint, int64, uint64])
 AC_C_CHAR_UNSIGNED
 AC_C_BIGENDIAN
+
+###
+# Crude hack to work around an issue
+# in Cygwin.
+###
+SLEEPCMD=""
+PLTFORMOUT="$(uname | cut -d '_' -f 1)"
+if test "$PLTFORMOUT" = "CYGWIN"; then
+   SLEEPCMD="sleep 5"
+   AC_MSG_NOTICE([Pausing between sizeof() checks to mitigate a Cygwin issue.])
+fi
+
+$SLEEPCMD
 AC_CHECK_SIZEOF(short)
+$SLEEPCMD
 AC_CHECK_SIZEOF(int)
+$SLEEPCMD
 AC_CHECK_SIZEOF(long)
+$SLEEPCMD
 AC_CHECK_SIZEOF(long long)
+$SLEEPCMD
 AC_CHECK_SIZEOF(float)
+$SLEEPCMD
 AC_CHECK_SIZEOF(double)
+$SLEEPCMD
 AC_CHECK_SIZEOF(off_t)
+$SLEEPCMD
 AC_CHECK_SIZEOF(size_t)
+$SLEEPCMD
+AC_CHECK_SIZEOF(unsigned long long)
+
+$SLEEPCMD
+if test "$ac_cv_type_ushort" = yes ; then
+   AC_CHECK_SIZEOF(ushort)
+else
+   AC_CHECK_SIZEOF(unsigned short int)
+fi
+
+$SLEEPCMD
+if test "$ac_cv_type_uint" = yes ; then
+   AC_CHECK_SIZEOF(uint)
+else
+   AC_CHECK_SIZEOF(unsigned int)
+fi
+
+$SLEEPCMD
+AC_CHECK_SIZEOF(unsigned long long)
+
+$SLEEPCMD
+if test "$ac_cv_type_ushort" = yes ; then
+   AC_CHECK_SIZEOF(ushort)
+else
+   AC_CHECK_SIZEOF(unsigned short int)
+fi
+$SLEEPCMD
+if test "$ac_cv_type_uint" = yes ; then
+   AC_CHECK_SIZEOF(uint)
+else
+   AC_CHECK_SIZEOF(unsigned int)
+fi
+$SLEEPCMD
+AC_CHECK_SIZEOF(ptrdiff_t)
+
 
 if test "x$enable_netcdf_4" = xyes || test "x$enable_dap" = xyes; then
    AC_SEARCH_LIBS([deflate], [zlibwapi zlibstat zlib zlib1 z], [], [
@@ -840,7 +903,7 @@ if test "x$enable_netcdf_4" = xyes; then
    [AC_MSG_ERROR([Can't find or link to the hdf5 high-level. Use --disable-netcdf-4, or see config.log for errors.])])
 
    AC_CHECK_HEADERS([hdf5.h], [], [AC_MSG_ERROR([Compiling a test with HDF5 failed.  Either hdf5.h cannot be found, or config.log should be checked for other reason.])])
-   AC_CHECK_FUNCS([H5Pget_fapl_mpiposix H5Pget_fapl_mpio H5Pset_deflate H5Z_SZIP])
+   AC_CHECK_FUNCS([H5Pget_fapl_mpiposix H5Pget_fapl_mpio H5Pset_deflate H5Z_SZIP H5free_memory])
 
    # The user may have parallel HDF5 based on MPI POSIX.
    if test "x$ac_cv_func_H5Pget_fapl_mpiposix" = xyes; then
@@ -852,15 +915,13 @@ if test "x$enable_netcdf_4" = xyes; then
       AC_DEFINE([USE_PARALLEL_MPIO], [1], [if true, compile in parallel netCDF-4 based on MPI/IO])
    fi
 
-   # If parallel is in use, enable it in the C code. Also add some stuff to netcdf.h.
-   enable_parallel=no
+   # If parallel is available in hdf5, enable it in the C code. Also add some stuff to netcdf.h.
+   hdf5_parallel=no
    if test "x$ac_cv_func_H5Pget_fapl_mpio" = xyes -o "x$ac_cv_func_H5Pget_fapl_mpiposix" = xyes; then
-      enable_parallel=yes
-      AC_DEFINE([USE_PARALLEL], [1], [if true, parallel netCDF-4 is in use])
+      hdf5_parallel=yes
    fi
-
-   AC_MSG_CHECKING([whether parallel I/O features are to be included])
-   AC_MSG_RESULT([$enable_parallel])
+   AC_MSG_CHECKING([whether parallel io is enabled in hdf5])
+   AC_MSG_RESULT([$hdf5_parallel])
 
    # The user must have built HDF5 with the ZLIB library.
    if test "x$ac_cv_func_H5Pset_deflate" = xyes; then
@@ -871,8 +932,12 @@ if test "x$enable_netcdf_4" = xyes; then
 
    # The user may have built HDF5 with the SZLIB library.
    if test "x$ac_cv_func_H5Z_SZIP" = xyes; then
-   	AC_SEARCH_LIBS([SZ_Compress], [szip sz], [], [])
+    AC_SEARCH_LIBS([SZ_Compress], [szip sz], [], [])
   	AC_DEFINE([USE_SZIP], [1], [if true, compile in szip compression in netCDF-4 variables])
+   fi
+
+   if test "x$ac_cv_func_H5free_memory" = xyes; then
+      AC_DEFINE([HDF5_HAS_H5FREE], [1], [if true, H5free_memory() will be used to free hdf5-allocated memory in nc4file.])
    fi
 
    # If the user wants hdf4 built in, check it out.
@@ -890,11 +955,104 @@ if test "x$enable_netcdf_4" = xyes; then
    fi
 fi
 
+# There are several cases for parallelism:
+# 1. pnetcdf enabled => we want to parallelism for CDF-1,CDF-2,and CDF-5
+# 2. hdf5 has mpio enabled
+#    a. do not want to use it for netcdf4
+#    b. do want to use it for netcdf4
+
+# Should we suppress parallel io for netcdf-4?
+if test "x$enable_netcdf_4" = xyes ; then
+     AC_MSG_CHECKING([whether parallel I/O is enabled for netcdf-4])
+     AC_ARG_ENABLE([parallel4], [AS_HELP_STRING([--disable-parallel4],
+                                          [disable parallel I/O for netcdf-4, even if it's enabled in libhdf5]  )])
+  test "x$enable_parallel4" = xno || enable_parallel4=yes
+  AC_MSG_RESULT($enable_parallel4)
+else
+  enable_parallel4=no
+fi
+if test "x$hdf5_parallel" = xno; then
+  # hdf5 does not support parallel io, so disable parallel4
+  enable_parallel4=no
+  AC_MSG_WARN([Parallel io disabled for netcdf-4 because hdf5 does not support])
+fi
+
+# We have already tested for parallel io in netcdf4
+# Now do it for netcdf-3
+# Does the user want parallel I/O for classic and 64-bit offset files using parallel-netcdf (pnetcdf)?
+AC_MSG_CHECKING([whether parallel I/O for classic files is to be enabled])
+AC_ARG_ENABLE([pnetcdf], [AS_HELP_STRING([--enable-pnetcdf],
+              [build with parallel I/O for classic files])])
+test "x$enable_pnetcdf" = xyes || enable_pnetcdf=no
+AC_MSG_RESULT($enable_pnetcdf)
+
+# See if the pnetcdf lib is available and of the
+# right version (1.6.0 or later)
+
+if test "x$enable_pnetcdf" = xyes; then
+  pnetcdf_conflict=no
+  AC_CHECK_LIB([pnetcdf], [ncmpi_create], [],[pnetcdf_conflict=yes])
+
+  # Pnetcdf did not support utf-8 until 1.6.0
+
+  # Save/restore CFLAGS
+  SAVELIBS=$LIBS
+  LIBS="$LIBS -lpnetcdf"
+  AC_RUN_IFELSE([AC_LANG_PROGRAM([#include <pnetcdf.h>],
+                 [[
+                   int major = PNETCDF_VERSION_MAJOR;
+                   int minor = PNETCDF_VERSION_MINOR;
+                   int version = major*1000 + minor;
+                   int ok = (version >= (1*1000 + 6));
+                   return (ok?0:1);]])],
+                 [pnetcdf16=yes],
+                 [pnetcdf16=no])
+  CFLAGS="$SAVECFLAGS"
+  LIBS="$SAVELIBS"
+  AC_MSG_CHECKING([Is libpnetcdf version 1.6.0 or later?])
+  AC_MSG_RESULT([$pnetcdf16])
+  if test x$pnetcdf16 = xno; then
+    AC_MSG_WARN([--enable-pnetcdf requires version 1.6.0 or later; disabling])
+    pnetcdf_conflict=yes
+  fi
+fi
+
+if test "x$pnetcdf_conflict" = xyes ; then
+  AC_MSG_WARN([Cannot link to pnetcdf library, --enable-pnetcdf disabled.])
+  enable_pnetcdf=no
+fi
+
+# Now, set enable_parallel if either pnetcdf or parallel4 is set
+if test "x$enable_pnetcdf" = xyes -o "x$enable_parallel4" = xyes; then
+enable_parallel=yes
+else
+enable_parallel=no
+fi
+
+if test "x$hdf5_parallel" = xyes; then
+  # Provide more precise parallel control
+  AC_DEFINE([HDF5_PARALLEL], [1], [if true, hdf5 has parallelism enabled])
+fi
+
+# Set config flags
+if test "x$enable_parallel4" = xyes; then
+  # Provide more precise parallel control
+  AC_DEFINE([USE_PARALLEL4], [1], [if true, parallel netcdf-4 is in use])
+fi
+
+if test "x$enable_pnetcdf" = xyes; then
+  AC_DEFINE([USE_PNETCDF], [1], [if true, parallel netCDF is used])
+fi
+
+# If enable_parallel is in use, enable it in the C code. Also add some stuff to netcdf.h.
+if test "x$enable_parallel" = xyes; then
+  AC_DEFINE([USE_PARALLEL], [1], [if true, pnetcdf or parallel netcdf-4 is in use])
+fi
+
 # Check for downloading/building fortran via postinstall script.
 if test "x$enable_remote_fortran_bootstrap" = xyes; then
    AC_DEFINE([BUILD_FORTRAN], 1, [If true, will attempt to download and build netcdf-fortran.])
 fi
-
 
 # No logging for netcdf-3.
 if test "x$enable_netcdf_4" = xno; then
@@ -902,18 +1060,6 @@ if test "x$enable_netcdf_4" = xno; then
 fi
 if test "x$enable_logging" = xyes; then
    AC_DEFINE([LOGGING], 1, [If true, turn on logging.])
-fi
-
-# Using pnetcdf for classic parallel I/O?
-if test "x$enable_pnetcdf" = xyes; then
-  AC_CHECK_LIB([pnetcdf], [ncmpi_create], [],
-  [AC_MSG_ERROR([Cannot link to pnetcdf library, yet --enable-pnetcdf was used.])])
-  AC_DEFINE([USE_PNETCDF], [1], [if true, parallel netCDF is used])
-
-  # pnetcdf => parallel
-  # If parallel is in use, enable it in the C code. Also add some stuff to netcdf.h.
-  enable_parallel=yes
-  AC_DEFINE([USE_PARALLEL], [1], [if true, pnetcdf or parallel netcdf-4 is in use])
 fi
 
 
@@ -946,7 +1092,7 @@ fi
 # Automake conditionals need to be called, whether the answer is yes
 # or no.
 AM_CONDITIONAL(BUILD_PARALLEL, [test x$enable_parallel = xyes])
-AM_CONDITIONAL(TEST_PARALLEL, [test "x$enable_parallel" = xyes -a "x$enable_parallel_tests" = xyes])
+AM_CONDITIONAL(TEST_PARALLEL4, [test "x$enable_parallel4" = xyes -a "x$enable_parallel_tests" = xyes])
 AM_CONDITIONAL(BUILD_DAP, [test "x$enable_dap" = xyes])
 AM_CONDITIONAL(USE_DAP, [test "x$enable_dap" = xyes]) # Alias
 AM_CONDITIONAL(ENABLE_DAP_REMOTE_TESTS, [test "x$enable_dap_remote_tests" = xyes])
@@ -965,10 +1111,10 @@ AM_CONDITIONAL(USE_RENAMEV3, [test x$enable_netcdf_4 = xyes -o x$enable_dap = xy
 AM_CONDITIONAL(BUILD_FORTRAN, [test x$enable_remote_fortran_bootstrap = xyes])
 AM_CONDITIONAL(USE_PNETCDF, [test x$enable_pnetcdf = xyes])
 AM_CONDITIONAL(USE_DISPATCH, [test x$enable_dispatch = xyes])
-AM_CONDITIONAL(BUILD_CDMREMOTE, [test "x$enable_cdmremote" = xyes]) # Alias
-AM_CONDITIONAL(BUILD_RPC, [test "x$enable_rpc" = xyes])
 AM_CONDITIONAL(BUILD_DISKLESS, [test x$enable_diskless = xyes])
 AM_CONDITIONAL(BUILD_MMAP, [test x$enable_mmap = xyes])
+AM_CONDITIONAL(BUILD_DOCS, [test x$enable_doxygen = xyes])
+AM_CONDITIONAL(SHOW_DOXYGEN_TAG_LIST, [test x$enable_doxygen_tasks = xyes])
 
 # If the machine doesn't have a long long, and we want netCDF-4, then
 # we've got problems!
@@ -994,7 +1140,21 @@ BINFILE_NAME=${BINFILE_NAME}.tar
 AC_SUBST(BINFILE_NAME)
 AC_MSG_RESULT([$BINFILE_NAME $FC $CXX])
 
-#UD_FTPBINDIR
+##
+# Bugfix for Cygwin.
+##
+AC_MSG_CHECKING([if libtool needs -no-undefined flag to build shared libraries])
+case "`uname`" in
+     CYGWIN*|MINGW*|AIX*)
+     ## Add in the -no-undefined flag to LDFLAGS for libtool.
+     AC_MSG_RESULT([yes])
+     NOUNDEFINED=" -no-undefined"
+     ;;
+     *)
+     ## Don't add anything
+     AC_MSG_RESULT([no])
+     ;;
+esac
 
 AC_MSG_CHECKING([value of LIBS])
 AC_MSG_RESULT([$LIBS])
@@ -1042,7 +1202,6 @@ if test "x$enable_jna" = xyes ; then
 AC_DEFINE([JNA], [1], [if true, include JNA bug fix])
 fi
 
-
 AC_SUBST(NC_LIBS,[$NC_LIBS])
 AC_SUBST(HAS_DAP,[$enable_dap])
 AC_SUBST(HAS_NC2,[$nc_build_v2])
@@ -1052,6 +1211,7 @@ AC_SUBST(HAS_PNETCDF,[$enable_pnetcdf])
 AC_SUBST(HAS_HDF5,[$enable_netcdf_4])
 AC_SUBST(HAS_SZLIB,[$nc_has_szlib])
 AC_SUBST(HAS_PARALLEL,[$enable_parallel])
+AC_SUBST(HAS_PARALLEL4,[$enable_parallel4])
 AC_SUBST(HAS_DISKLESS,[$enable_diskless])
 AC_SUBST(HAS_MMAP,[$enable_mmap])
 AC_SUBST(HAS_JNA,[$enable_jna])
@@ -1086,6 +1246,7 @@ AC_SUBST([LDFLAGS])
 AC_SUBST([AM_CFLAGS])
 AC_SUBST([AM_CPPFLAGS])
 AC_SUBST([AM_LDFLAGS])
+AC_SUBST([NOUNDEFINED])
 
 # Args:
 # 1. netcdf_meta.h variable
@@ -1117,6 +1278,7 @@ AX_SET_META([NC_HAS_MMAP],[$enable_mmap],[yes])
 AX_SET_META([NC_HAS_JNA],[$enable_jna],[yes])
 AX_SET_META([NC_HAS_PNETCDF],[$enable_pnetcdf],[yes])
 AX_SET_META([NC_HAS_PARALLEL],[$enable_parallel],[yes])
+AX_SET_META([NC_HAS_PARALLEL4],[$enable_parallel4],[yes])
 
 #####
 # End netcdf_meta.h definitions.
@@ -1135,7 +1297,7 @@ AC_CONFIG_FILES([Makefile
                  docs/images/Makefile
                  libsrc/Makefile
                  libsrc4/Makefile
-                 libsrc5/Makefile
+                 libsrcp/Makefile
                  nctest/Makefile
                  nc_test4/Makefile
                  nc_test/Makefile

@@ -7,6 +7,12 @@
 #include "ncd2dispatch.h"
 #include "dapalign.h"
 
+#ifdef _MSC_VER
+#include <crtdbg.h>
+#endif
+
+#define NCRCFILE "NCRCFILE"
+
 #ifdef HAVE_GETRLIMIT
 #  ifdef HAVE_SYS_RESOURCE_H
 #    include <sys/time.h>
@@ -88,7 +94,7 @@ static int NCD2_get_vars(int ncid, int varid,
 
 static NC_Dispatch NCD2_dispatch_base = {
 
-NC_DISPATCH_NC3 | NC_DISPATCH_NCD,
+NC_FORMATX_DAP2,
 
 NCD2_create,
 NCD2_open,
@@ -203,6 +209,18 @@ NCD2_initialize(void)
     if(nclogopen(NULL))
         ncsetlogging(1); /* turn it on */
 #endif
+    /* Look at env vars for rc file location */
+    if(getenv(NCRCFILE) != NULL) {
+	const char* ncrcfile = getenv(NCRCFILE);
+	if(oc_set_rcfile(ncrcfile) != OC_NOERR)
+	    return NC_EAUTH;
+    }
+    return NC_NOERR;
+}
+
+int
+NCD2_finalize(void)
+{
     return NC_NOERR;
 }
 
@@ -927,12 +945,23 @@ buildattribute(NCDAPCOMMON* dapcomm, NCattribute* att, nc_type vartype, int vari
 	else
 	    atype = nctypeconvert(dapcomm,att->etype);
 	typesize = nctypesizeof(atype);
-    if(nvalues > 0)
-      mem = malloc(typesize * nvalues);
+	if (nvalues > 0) {
+		mem = malloc(typesize * nvalues);
+#ifdef _MSC_VER
+		_ASSERTE(_CrtCheckMemory());
+#endif
+	}
     ncstat = dapcvtattrval(atype,mem,att->values);
+#ifdef _MSC_VER
+	_ASSERTE(_CrtCheckMemory());
+#endif
     ncstat = nc_put_att(drno->substrate,varid,att->name,atype,nvalues,mem);
-	nullfree(mem);
-    }
+#ifdef _MSC_VER
+	_ASSERTE(_CrtCheckMemory());
+#endif
+	if (mem != NULL)
+		free(mem);
+	}
     return THROW(ncstat);
 }
 
@@ -977,7 +1006,7 @@ NCD2_inq_format_extended(int ncid, int* formatp, int* modep)
     int ncstatus = NC_check_id(ncid, (NC**)&nc);
     if(ncstatus != NC_NOERR) return THROW(ncstatus);
     if(modep) *modep = nc->mode;
-    if(formatp) *formatp = NC_FORMAT_DAP2;
+    if(formatp) *formatp = NC_FORMATX_DAP2;
     return NC_NOERR;
 }
 
@@ -1131,19 +1160,21 @@ fprintf(stderr,"conflict: %s[%lu] %s[%lu]\n",
     /* Verify unique and defined names for dimensions*/
     for(i=0;i<nclistlength(basedims);i++) {
 	CDFnode* dim1 = (CDFnode*)nclistget(basedims,i);
+        CDFnode* dim2 = NULL;
 	if(dim1->dim.basedim != NULL) PANIC1("nonbase basedim: %s\n",dim1->ncbasename);
 	if(dim1->ncbasename == NULL || dim1->ncfullname == NULL)
 	    PANIC1("missing dim names: %s",dim1->ocname);
 	/* search backward so we can delete duplicates */
 	for(j=nclistlength(basedims)-1;j>i;j--) {
-	    CDFnode* dim2 = (CDFnode*)nclistget(basedims,j);
-	    if(strcmp(dim1->ncfullname,dim2->ncfullname)==0) {
+      if(!dim1->ncfullname) continue;
+      dim2 = (CDFnode*)nclistget(basedims,j);
+      if(strcmp(dim1->ncfullname,dim2->ncfullname)==0) {
 		/* complain and suppress one of them */
 		fprintf(stderr,"duplicate dim names: %s[%lu] %s[%lu]\n",
-			dim1->ncfullname,(unsigned long)dim1->dim.declsize,
-			dim2->ncfullname,(unsigned long)dim2->dim.declsize);
+                dim1->ncfullname,(unsigned long)dim1->dim.declsize,
+                dim2->ncfullname,(unsigned long)dim2->dim.declsize);
 		nclistremove(basedims,j);
-	    }
+      }
 	}
     }
 

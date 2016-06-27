@@ -12,18 +12,20 @@ COPYRIGHT file for copying and redistribution conditions.
 #include "config.h"
 #include <errno.h>  /* netcdf functions sometimes return system errors */
 
+
 #include "nc.h"
 #include "nc4internal.h"
 #include "nc4dispatch.h"
 
-#include "H5DSpublic.h"
+/* must be after nc4internal.h */
+#include <H5DSpublic.h>
 
 #ifdef USE_HDF4
 #include <mfhdf.h>
 #endif
 
-#if 0 /*def USE_PNETCDF*/
-#include <pnetcdf.h>
+#ifdef USE_DISKLESS
+#include <hdf5_hl.h>
 #endif
 
 /* This is to track opened HDF5 objects to make sure they are
@@ -42,6 +44,11 @@ extern int num_spaces;
 #define CLASS "CLASS"
 #define DIMENSION_LIST "DIMENSION_LIST"
 #define NAME "NAME"
+
+/* Define the illegal mode flags */
+static const int ILLEGAL_OPEN_FLAGS = (NC_MMAP|NC_64BIT_OFFSET);
+
+static const int ILLEGAL_CREATE_FLAGS = (NC_NOWRITE|NC_MMAP|NC_INMEMORY|NC_64BIT_OFFSET|NC_CDF5);
 
 /*! Struct to track information about objects in a group, for nc4_rec_read_metadata()
 
@@ -183,24 +190,40 @@ nc4typelen(nc_type type)
 #define NC_HDF5_FILE 1
 #define NC_HDF4_FILE 2
 static int
-nc_check_for_hdf(const char *path, int use_parallel, MPI_Comm comm, MPI_Info info,
-		 int *hdf_file)
+nc_check_for_hdf(const char *path, int flags, void* parameters, int *hdf_file)
 {
    char blob[MAGIC_NUMBER_LEN];
+#ifdef USE_PARALLEL4
+   int use_parallel = ((flags & NC_MPIIO) == NC_MPIIO);
+   NC_MPI_INFO* mpiinfo = (NC_MPI_INFO*)parameters;
+   MPI_Comm comm = MPI_COMM_WORLD;
+   MPI_Info info = MPI_INFO_NULL;
+#endif
+   int inmemory = ((flags & NC_INMEMORY) == NC_INMEMORY);
+#ifdef USE_DISKLESS
+   NC_MEM_INFO* meminfo = (NC_MEM_INFO*)parameters;
+#endif
 
-   assert(hdf_file && path);
+#ifdef USE_PARALLEL4
+   if(use_parallel) {
+       comm = mpiinfo->comm;
+       info = mpiinfo->info;
+   }
+#endif
+
+   assert(hdf_file);
    LOG((3, "%s: path %s", __func__, path));
 
    /* HDF5 function handles possible user block at beginning of file */
-   if(H5Fis_hdf5(path))
+   if(!inmemory && H5Fis_hdf5(path))
    {
        *hdf_file = NC_HDF5_FILE;
    } else {
 
 /* Get the 4-byte blob from the beginning of the file. Don't use posix
  * for parallel, use the MPI functions instead. */
-#ifdef USE_PARALLEL
-       if (use_parallel)
+#ifdef USE_PARALLEL4
+       if (!inmemory && use_parallel)
        {
 	   MPI_File fh;
 	   MPI_Status status;
@@ -215,8 +238,8 @@ nc_check_for_hdf(const char *path, int use_parallel, MPI_Comm comm, MPI_Info inf
 	       return NC_EPARINIT;
        }
        else
-#endif /* USE_PARALLEL */
-       {
+#endif /* USE_PARALLEL4 */
+       if(!inmemory) {
 	   FILE *fp;
 	   if (!(fp = fopen(path, "r")) ||
 	       fread(blob, MAGIC_NUMBER_LEN, 1, fp) != 1) {
@@ -225,11 +248,17 @@ nc_check_for_hdf(const char *path, int use_parallel, MPI_Comm comm, MPI_Info inf
 	     return errno;
 	   }
 	   fclose(fp);
+       } else { /*inmemory*/
+	  if(meminfo->size < MAGIC_NUMBER_LEN)
+	    return NC_ENOTNC;
+	  memcpy(blob,meminfo->memory,MAGIC_NUMBER_LEN);
        }
 
        /* Check for HDF4. */
-       if (!strncmp(blob, "\016\003\023\001", MAGIC_NUMBER_LEN))
+       if (memcmp(blob, "\016\003\023\001", 4)==0)
 	   *hdf_file = NC_HDF4_FILE;
+       else if (memcmp(blob, "HDF", 3)==0)
+	   *hdf_file = NC_HDF5_FILE;
        else
 	   *hdf_file = 0;
    }
@@ -247,10 +276,10 @@ nc4_create_file(const char *path, int cmode, MPI_Comm comm, MPI_Info info,
    FILE *fp;
    int retval = NC_NOERR;
    NC_HDF5_FILE_INFO_T* nc4_info = NULL;
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
    int comm_duped = 0;          /* Whether the MPI Communicator was duplicated */
    int info_duped = 0;          /* Whether the MPI Info object was duplicated */
-#else /* !USE_PARALLEL */
+#else /* !USE_PARALLEL4 */
    int persist = 0; /* Should diskless try to persist its data into file?*/
 #endif
 
@@ -269,7 +298,7 @@ nc4_create_file(const char *path, int cmode, MPI_Comm comm, MPI_Info info,
    /* If this file already exists, and NC_NOCLOBBER is specified,
       return an error. */
    if (cmode & NC_DISKLESS) {
-#ifndef USE_PARALLEL
+#ifndef USE_PARALLEL4
 	if(cmode & NC_WRITE)
 	    persist = 1;
 #endif
@@ -305,7 +334,7 @@ nc4_create_file(const char *path, int cmode, MPI_Comm comm, MPI_Info info,
       BAIL(NC_EHDFERR);
 #endif /* EXTRA_TESTS */
 
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
    /* If this is a parallel file create, set up the file creation
       property list. */
    if ((cmode & NC_MPIIO) || (cmode & NC_MPIPOSIX))
@@ -359,7 +388,7 @@ nc4_create_file(const char *path, int cmode, MPI_Comm comm, MPI_Info info,
       BAIL(NC_EHDFERR);
    LOG((4, "%s: set HDF raw chunk cache to size %d nelems %d preemption %f",
 	__func__, nc4_chunk_cache_size, nc4_chunk_cache_nelems, nc4_chunk_cache_preemption));
-#endif /* USE_PARALLEL */
+#endif /* USE_PARALLEL4 */
 
    if (H5Pset_libver_bounds(fapl_id, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST) < 0)
       BAIL(NC_EHDFERR);
@@ -411,7 +440,7 @@ nc4_create_file(const char *path, int cmode, MPI_Comm comm, MPI_Info info,
    return NC_NOERR;
 
 exit: /*failure exit*/
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
    if (comm_duped) MPI_Comm_free(&nc4_info->comm);
    if (info_duped) MPI_Info_free(&nc4_info->info);
 #endif
@@ -433,7 +462,7 @@ Create a netCDF-4/HDF5 file.
 \param basepe Ignored by this function.
 \param chunksizehintp Ignored by this function.
 \param use_parallel 0 for sequential, non-zero for parallel I/O.
-\param mpidata pointer to struct holdind data for parallel I/O
+\param parameters pointer to struct holding extra data (e.g. for parallel I/O)
 layer. Ignored if NULL.
 \param dispatch Pointer to the dispatch table for this file.
 \param nc_file Pointer to an instance of NC.
@@ -441,7 +470,7 @@ layer. Ignored if NULL.
 */
 int
 NC4_create(const char* path, int cmode, size_t initialsz, int basepe,
-	   size_t *chunksizehintp, int use_parallel, void *mpidata,
+	   size_t *chunksizehintp, int use_parallel, void *parameters,
 	   NC_Dispatch *dispatch, NC* nc_file)
 {
    MPI_Comm comm = MPI_COMM_WORLD;
@@ -453,13 +482,13 @@ NC4_create(const char* path, int cmode, size_t initialsz, int basepe,
    LOG((1, "%s: path %s cmode 0x%x comm %d info %d",
 	__func__, path, cmode, comm, info));
 
-#ifdef USE_PARALLEL
-   if (mpidata)
+#ifdef USE_PARALLEL4
+   if (parameters)
    {
-      comm = ((NC_MPI_INFO *)mpidata)->comm;
-      info = ((NC_MPI_INFO *)mpidata)->info;
+      comm = ((NC_MPI_INFO *)parameters)->comm;
+      info = ((NC_MPI_INFO *)parameters)->info;
    }
-#endif /* USE_PARALLEL */
+#endif /* USE_PARALLEL4 */
 
    /* If this is our first file, turn off HDF5 error messages. */
    if (virgin)
@@ -471,16 +500,15 @@ NC4_create(const char* path, int cmode, size_t initialsz, int basepe,
    }
 
    /* Check the cmode for validity. */
-   if (cmode & ~(NC_NOCLOBBER | NC_64BIT_OFFSET
-                 | NC_NETCDF4 | NC_CLASSIC_MODEL
-                 | NC_SHARE | NC_MPIIO | NC_MPIPOSIX | NC_LOCK | NC_PNETCDF
-		 | NC_DISKLESS
-		 | NC_WRITE /* to support diskless persistence */
-                 )
-       || (cmode & NC_MPIIO && cmode & NC_MPIPOSIX)
-       || (cmode & NC_64BIT_OFFSET && cmode & NC_NETCDF4)
-       || (cmode & (NC_MPIIO | NC_MPIPOSIX) && cmode & NC_DISKLESS)
-      )
+   if((cmode & ILLEGAL_CREATE_FLAGS) != 0)
+      return NC_EINVAL;
+
+   /* Cannot have both */
+   if((cmode & (NC_MPIIO|NC_MPIPOSIX)) == (NC_MPIIO|NC_MPIPOSIX))
+      return NC_EINVAL;
+
+   /* Currently no parallel diskless io */
+   if((cmode & (NC_MPIIO | NC_MPIPOSIX)) && (cmode & NC_DISKLESS))
       return NC_EINVAL;
 
 #ifndef USE_PARALLEL_POSIX
@@ -497,7 +525,9 @@ NC4_create(const char* path, int cmode, size_t initialsz, int basepe,
    cmode |= NC_NETCDF4;
 
    /* Apply default create format. */
-   if (nc_get_default_format() == NC_FORMAT_64BIT)
+   if (nc_get_default_format() == NC_FORMAT_CDF5)
+      cmode |= NC_CDF5;
+   else if (nc_get_default_format() == NC_FORMAT_64BIT_OFFSET)
       cmode |= NC_64BIT_OFFSET;
    else if (nc_get_default_format() == NC_FORMAT_NETCDF4_CLASSIC)
       cmode |= NC_CLASSIC_MODEL;
@@ -895,31 +925,27 @@ get_type_info2(NC_HDF5_FILE_INFO_T *h5, hid_t datasetid,
 	       break;
 	 }
 
-	 /* Find out about endianness. */
-	 if (class == H5T_INTEGER)
-	 {
-	    if ((order = H5Tget_order(hdf_typeid)) < 0)
-	       return NC_EHDFERR;
+     /* Find out about endianness.
+      * As of HDF 1.8.6, this works with all data types
+      * Not just H5T_INTEGER.
+      *
+      * See https://www.hdfgroup.org/HDF5/doc/RM/RM_H5T.html#Datatype-GetOrder
+      */
+     if((order = H5Tget_order(hdf_typeid)) < 0)
+         return NC_EHDFERR;
 
-	    /* Copy this into the type_info struct. */
-	    if (order == H5T_ORDER_LE)
-               (*type_info)->endianness = NC_ENDIAN_LITTLE;
-	    else if (order == H5T_ORDER_BE)
-               (*type_info)->endianness = NC_ENDIAN_BIG;
-	    else /* don't support H5T_ORDER_VAX, H5T_ORDER_MIXED, H5T_ORDER_NONE */
-		return NC_EBADTYPE;
+     if(order == H5T_ORDER_LE)
+         (*type_info)->endianness = NC_ENDIAN_LITTLE;
+     else if(order == H5T_ORDER_BE)
+         (*type_info)->endianness = NC_ENDIAN_BIG;
+     else
+         return NC_EBADTYPE;
 
-            /* Set a class for the type */
-            /* (Note use of 'NC_INT' for all integer types) */
-            (*type_info)->nc_type_class = NC_INT;
-	 }
-         else
-         {
-            /* Set a class for the type */
-            /* (Note use of 'NC_FLOAT' for all floating-point types) */
-            (*type_info)->nc_type_class = NC_FLOAT;
-         }
-      }
+     if(class == H5T_INTEGER)
+          (*type_info)->nc_type_class = NC_INT;
+     else
+        (*type_info)->nc_type_class = NC_FLOAT;
+    }
       (*type_info)->nc_typeid = nc_type_constant_g[t];
       (*type_info)->size = nc_type_size_g[t];
       if (!((*type_info)->name = strdup(nc_type_name_g[t])))
@@ -1284,11 +1310,18 @@ read_type(NC_GRP_INFO_T *grp, hid_t hdf_typeid, char *type_name)
                }
 
 #ifndef JNA
+
                /* Free the member name (which HDF5 allocated for us). */
 			   /* On Windows using the microsoft runtime, it is an error
-				  for one library to free memory allocated by a different library. */
+				  for one library to free memory allocated by a different library.
+                  IF it is available, we should use H5free_memory*/
+
+#ifdef HDF5_HAS_H5FREE
+               if(member_name != NULL) H5free_memory(member_name);
+#else
 #ifndef _MSC_VER
                if(member_name != NULL) free(member_name);
+#endif
 #endif
 #endif
 	       member_name = NULL;
@@ -2151,24 +2184,25 @@ exit:
  * ncfunc.c in nc_open, but here the netCDF-4 part of opening a file
  * is handled. */
 static int
-nc4_open_file(const char *path, int mode, MPI_Comm comm,
-	      MPI_Info info, NC *nc)
+nc4_open_file(const char *path, int mode, void* parameters, NC *nc)
 {
    hid_t fapl_id = H5P_DEFAULT;
    unsigned flags = (mode & NC_WRITE) ?
       H5F_ACC_RDWR : H5F_ACC_RDONLY;
    int retval;
    NC_HDF5_FILE_INFO_T* nc4_info = NULL;
-#ifdef USE_PARALLEL
+   int inmemory = ((mode & NC_INMEMORY) == NC_INMEMORY);
+#ifdef USE_DISKLESS
+   NC_MEM_INFO* meminfo = (NC_MEM_INFO*)parameters;
+#endif
+#ifdef USE_PARALLEL4
+   NC_MPI_INFO* mpiinfo = (NC_MPI_INFO*)parameters;
    int comm_duped = 0;          /* Whether the MPI Communicator was duplicated */
    int info_duped = 0;          /* Whether the MPI Info object was duplicated */
-#endif /* !USE_PARALLEL */
+#endif /* !USE_PARALLEL4 */
 
    LOG((3, "%s: path %s mode %d", __func__, path, mode));
    assert(path && nc);
-   /* Stop diskless open in its tracks */
-   if(mode & NC_DISKLESS)
-	return NC_EDISKLESS;
 
    /* Add necessary structs to hold netcdf-4 file data. */
    if ((retval = nc4_nc4f_list_add(nc, path, mode)))
@@ -2176,7 +2210,7 @@ nc4_open_file(const char *path, int mode, MPI_Comm comm,
    nc4_info = NC4_DATA(nc);
    assert(nc4_info && nc4_info->root_grp);
 
-   /* Need this access plist to control how HDF5 handles open onjects
+   /* Need this access plist to control how HDF5 handles open objects
     * on file close. (Setting H5F_CLOSE_SEMI will cause H5Fclose to
     * fail if there are any open objects in the file. */
    if ((fapl_id = H5Pcreate(H5P_FILE_ACCESS)) < 0)
@@ -2192,7 +2226,7 @@ nc4_open_file(const char *path, int mode, MPI_Comm comm,
       BAIL(NC_EHDFERR);
 #endif
 
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
    /* If this is a parallel file create, set up the file creation
       property list. */
    if (mode & NC_MPIIO || mode & NC_MPIPOSIX)
@@ -2201,14 +2235,14 @@ nc4_open_file(const char *path, int mode, MPI_Comm comm,
       if (mode & NC_MPIIO)  /* MPI/IO */
       {
 	 LOG((4, "opening parallel file with MPI/IO"));
-	 if (H5Pset_fapl_mpio(fapl_id, comm, info) < 0)
+	 if (H5Pset_fapl_mpio(fapl_id, mpiinfo->comm, mpiinfo->info) < 0)
 	    BAIL(NC_EPARINIT);
       }
 #ifdef USE_PARALLEL_POSIX
       else /* MPI/POSIX */
       {
 	 LOG((4, "opening parallel file with MPI/posix"));
-	 if (H5Pset_fapl_mpiposix(fapl_id, comm, 0) < 0)
+	 if (H5Pset_fapl_mpiposix(fapl_id, mpiinfo->comm, 0) < 0)
 	    BAIL(NC_EPARINIT);
       }
 #else /* USE_PARALLEL_POSIX */
@@ -2221,19 +2255,19 @@ nc4_open_file(const char *path, int mode, MPI_Comm comm,
 #endif /* USE_PARALLEL_POSIX */
 
       /* Keep copies of the MPI Comm & Info objects */
-      if (MPI_SUCCESS != MPI_Comm_dup(comm, &nc4_info->comm))
+      if (MPI_SUCCESS != MPI_Comm_dup(mpiinfo->comm, &nc4_info->comm))
          BAIL(NC_EMPI);
       comm_duped++;
-      if (MPI_INFO_NULL != info)
+      if (MPI_INFO_NULL != mpiinfo->info)
       {
-         if (MPI_SUCCESS != MPI_Info_dup(info, &nc4_info->info))
+         if (MPI_SUCCESS != MPI_Info_dup(mpiinfo->info, &nc4_info->info))
             BAIL(NC_EMPI);
          info_duped++;
       }
       else
       {
          /* No dup, just copy it. */
-         nc4_info->info = info;
+         nc4_info->info = mpiinfo->info;
       }
    }
 #else /* only set cache for non-parallel. */
@@ -2242,12 +2276,18 @@ nc4_open_file(const char *path, int mode, MPI_Comm comm,
       BAIL(NC_EHDFERR);
    LOG((4, "%s: set HDF raw chunk cache to size %d nelems %d preemption %f",
 	__func__, nc4_chunk_cache_size, nc4_chunk_cache_nelems, nc4_chunk_cache_preemption));
-#endif /* USE_PARALLEL */
+#endif /* USE_PARALLEL4 */
 
    /* The NetCDF-3.x prototype contains an mode option NC_SHARE for
       multiple processes accessing the dataset concurrently.  As there
       is no HDF5 equivalent, NC_SHARE is treated as NC_NOWRITE. */
-   if ((nc4_info->hdfid = H5Fopen(path, flags, fapl_id)) < 0)
+   if(inmemory) {
+       if((nc4_info->hdfid = H5LTopen_file_image(meminfo->memory,meminfo->size,
+			H5LT_FILE_IMAGE_DONT_COPY|H5LT_FILE_IMAGE_DONT_RELEASE
+			)) < 0)
+           BAIL(NC_EHDFERR);
+       nc4_info->no_write = NC_TRUE;
+   } else if ((nc4_info->hdfid = H5Fopen(path, flags, fapl_id)) < 0)
       BAIL(NC_EHDFERR);
 
    /* Does the mode specify that this file is read-only? */
@@ -2282,7 +2322,7 @@ nc4_open_file(const char *path, int mode, MPI_Comm comm,
    return NC_NOERR;
 
 exit:
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
    if (comm_duped) MPI_Comm_free(&nc4_info->comm);
    if (info_duped) MPI_Info_free(&nc4_info->info);
 #endif
@@ -2295,57 +2335,118 @@ exit:
    return retval;
 }
 
-/* Given an HDF4 type, set a pointer to netcdf type. */
 #ifdef USE_HDF4
+/*! Given an HDF4 type, set a pointer to netcdf type.
+ *
+ * Given an HDF4 type, set a pointer to a netcdf type.
+ * See http://www.hdfgroup.org/training/HDFtraining/UsersGuide/Fundmtls.fm3.html
+ * for more information re: HDF4 types.
+ *
+ * \param NC_HDF5_FILE_INFO_T* Pointer to h5
+ * \param int32 TypeID for hdf4 datatype.
+ * \param nc_type* Pointer to netcdf type, where result will be stored.
+ * \param NC_TYPE_INFO_T* (Optiona) Type info for the variable.
+ * \return Error code, 0 on success.
+ *
+ */
 static int
 get_netcdf_type_from_hdf4(NC_HDF5_FILE_INFO_T *h5, int32 hdf4_typeid,
 			  nc_type *xtype, NC_TYPE_INFO_T *type_info)
 {
-   int t;
+   int t = 0;
+
+   /* Added this variable in the course of fixing NCF-332.
+    * Prior to the fix, all data types were assigned
+    * NC_ENDIAN_BIG, so I am preserving that here for now.
+    * Not sure why it wouldn't be NC_ENDIAN_NATIVE, although
+    * I can hazard a guess or two.
+    */
+
+   int endianness = NC_ENDIAN_BIG;
    assert(h5 && xtype);
 
    switch(hdf4_typeid)
    {
-      case DFNT_CHAR:
-	 *xtype = NC_CHAR;
-	 t = 0;
-	 break;
-      case DFNT_UCHAR:
-      case DFNT_UINT8:
-	 *xtype = NC_UBYTE;
-	 t = 6;
-	 break;
-      case DFNT_INT8:
-	 *xtype = NC_BYTE;
-	 t = 1;
-	 break;
-      case DFNT_INT16:
-	 *xtype = NC_SHORT;
-	 t = 2;
-	 break;
-      case DFNT_UINT16:
-	 *xtype = NC_USHORT;
-	 t = 7;
-	 break;
-      case DFNT_INT32:
-	 *xtype = NC_INT;
-	 t = 3;
-	 break;
-      case DFNT_UINT32:
-	 *xtype = NC_UINT;
-	 t = 8;
-	 break;
-      case DFNT_FLOAT32:
-	 *xtype = NC_FLOAT;
-	 t = 4;
-	 break;
-      case DFNT_FLOAT64:
-	 *xtype = NC_DOUBLE;
-	 t = 5;
-	 break;
-      default:
-	 *xtype = NC_NAT;
-	 return NC_EBADTYPID;
+   case DFNT_CHAR:
+       *xtype = NC_CHAR;
+       t = 0;
+       break;
+   case DFNT_UCHAR:
+   case DFNT_UINT8:
+       *xtype = NC_UBYTE;
+       t = 6;
+       break;
+   case DFNT_LUINT8:
+       *xtype = NC_UBYTE;
+       t = 6;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   case DFNT_INT8:
+       *xtype = NC_BYTE;
+       t = 1;
+       break;
+   case DFNT_LINT8:
+       *xtype = NC_BYTE;
+       t = 1;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   case DFNT_INT16:
+       *xtype = NC_SHORT;
+       t = 2;
+       break;
+   case DFNT_LINT16:
+       *xtype = NC_SHORT;
+       t = 2;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   case DFNT_UINT16:
+       *xtype = NC_USHORT;
+       t = 7;
+       break;
+   case DFNT_LUINT16:
+       *xtype = NC_USHORT;
+       t = 7;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   case DFNT_INT32:
+       *xtype = NC_INT;
+       t = 3;
+       break;
+   case DFNT_LINT32:
+        *xtype = NC_INT;
+       t = 3;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   case DFNT_UINT32:
+       *xtype = NC_UINT;
+       t = 8;
+       break;
+   case DFNT_LUINT32:
+        *xtype = NC_UINT;
+       t = 8;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   case DFNT_FLOAT32:
+       *xtype = NC_FLOAT;
+       t = 4;
+       break;
+   case DFNT_LFLOAT32:
+       *xtype = NC_FLOAT;
+       t = 4;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   case DFNT_FLOAT64:
+       *xtype = NC_DOUBLE;
+       t = 5;
+       break;
+   case DFNT_LFLOAT64:
+       *xtype = NC_DOUBLE;
+       t = 5;
+       endianness = NC_ENDIAN_LITTLE;
+       break;
+   default:
+       *xtype = NC_NAT;
+       return NC_EBADTYPID;
    }
 
    if (type_info)
@@ -2358,11 +2459,11 @@ get_netcdf_type_from_hdf4(NC_HDF5_FILE_INFO_T *h5, int32 hdf4_typeid,
 	 type_info->nc_type_class = NC_STRING;
       else
 	 type_info->nc_type_class = NC_INT;
-      type_info->endianness = NC_ENDIAN_BIG;
+      type_info->endianness = endianness;
       type_info->nc_typeid = *xtype;
       type_info->size = nc_type_size_g[t];
       if (!(type_info->name = strdup(nc_type_name_g[t])))
-	 return NC_ENOMEM;
+        return NC_ENOMEM;
    }
 
    return NC_NOERR;
@@ -2667,25 +2768,26 @@ nc4_open_hdf4_file(const char *path, int mode, NC *nc)
 
 int
 NC4_open(const char *path, int mode, int basepe, size_t *chunksizehintp,
-	 int use_parallel, void *mpidata, NC_Dispatch *dispatch, NC *nc_file)
+	 int use_parallel, void *parameters, NC_Dispatch *dispatch, NC *nc_file)
 {
-   int hdf_file = 0;
-   MPI_Comm comm = MPI_COMM_WORLD;
-   MPI_Info info = MPI_INFO_NULL;
    int res;
+   int hdf_file = 0;
+#ifdef USE_PARALLEL4
+   NC_MPI_INFO mpidfalt = {MPI_COMM_WORLD, MPI_INFO_NULL};
+#endif
+#if defined USE_PARALLEL4 || defined USE_HDF4
+   int inmemory = ((mode & NC_INMEMORY) == NC_INMEMORY);
+#endif
 
    assert(nc_file && path);
 
-   LOG((1, "%s: path %s mode %d comm %d info %d",
-	__func__, path, mode, comm, info));
+   LOG((1, "%s: path %s mode %d params %x",
+	__func__, path, mode, parameters));
 
-#ifdef USE_PARALLEL
-   if (mpidata)
-   {
-      comm = ((NC_MPI_INFO *)mpidata)->comm;
-      info = ((NC_MPI_INFO *)mpidata)->info;
-   }
-#endif /* USE_PARALLEL */
+#ifdef USE_PARALLEL4
+   if (!inmemory && use_parallel && parameters == NULL)
+	parameters = &mpidfalt;
+#endif /* USE_PARALLEL4 */
 
    /* If this is our first file, turn off HDF5 error messages. */
    if (virgin)
@@ -2696,12 +2798,13 @@ NC4_open(const char *path, int mode, int basepe, size_t *chunksizehintp,
       virgin = 0;
    }
 
-   /* Check the mode for validity. First make sure only certain bits
-    * are turned on. Also MPI I/O and MPI POSIX cannot both be
-    * selected at once. */
-   if (mode & ~(NC_WRITE | NC_SHARE | NC_MPIIO | NC_MPIPOSIX |
-		NC_PNETCDF | NC_NOCLOBBER | NC_NETCDF4 | NC_CLASSIC_MODEL) ||
-       (mode & NC_MPIIO && mode & NC_MPIPOSIX))
+
+   /* Check the mode for validity */
+   if((mode & ILLEGAL_OPEN_FLAGS) != 0)
+      return NC_EINVAL;
+
+   /* Cannot have both */
+   if((mode & (NC_MPIIO|NC_MPIPOSIX)) == (NC_MPIIO|NC_MPIPOSIX))
       return NC_EINVAL;
 
 #ifndef USE_PARALLEL_POSIX
@@ -2715,62 +2818,22 @@ NC4_open(const char *path, int mode, int basepe, size_t *chunksizehintp,
    }
 #endif /* USE_PARALLEL_POSIX */
 
+   /* Figure out if this is a hdf4 or hdf5 file. */
+   if ((res = nc_check_for_hdf(path, use_parallel, parameters, &hdf_file)))
+	return res;
 
    /* Depending on the type of file, open it. */
-
-#if 0 /*def USE_PNETCDF*/
-   if(mode & NC_PNETCDF) {
-	/* this is not really an hdf file */
-      int pnetcdf_nvars, i;
-      NC_HDF5_FILE_INFO_T* nc4_info;
-
-      /* Create the fake nc4_info data */
-      res = nc4_nc4f_list_add(nc_file, path, mode);
-
-      nc4_info = NC4_DATA(nc_file);
-      assert(nc4_info);
-
-      res = ncmpi_open(comm, path, mode, info, &(nc_file->int_ncid));
-      nc4_info->pnetcdf_file++;
-
-      /* Default to independent access, like netCDF-4/HDF5 files. */
-      if (!res)
-	 res = ncmpi_begin_indep_data(nc_file->int_ncid);
-
-      /* I need to keep track of the ndims of each var to translate
-       * start, count, and stride arrays to MPI_Offset type. */
-      if (!res)
-      {
-	 res = ncmpi_inq_nvars(nc_file->int_ncid, &pnetcdf_nvars);
-	 for (i = 0; i < pnetcdf_nvars; i++)
-	    res = ncmpi_inq_varndims(nc_file->int_ncid, i,
-				     &(nc4_info->pnetcdf_ndims[i]));
-
-      }
-   } else
-#endif
-   {
-      /* Figure out if this is a hdf4 or hdf5 file. */
-     if ((res = nc_check_for_hdf(path, use_parallel, comm, info, &hdf_file)))
-         return res;
-
-      if (hdf_file == NC_HDF5_FILE)
-      {
-         nc_file->int_ncid = nc_file->ext_ncid;
-         res = nc4_open_file(path, mode, comm, info, nc_file);
-      }
+   nc_file->int_ncid = nc_file->ext_ncid;
+   if (hdf_file == NC_HDF5_FILE)
+       res = nc4_open_file(path, mode, parameters, nc_file);
 #ifdef USE_HDF4
-      else if (hdf_file == NC_HDF4_FILE)
-      {
-         nc_file->int_ncid = nc_file->ext_ncid;
-         res = nc4_open_hdf4_file(path, mode, nc_file);
-      }
+   else if (hdf_file == NC_HDF4_FILE && inmemory)
+	return NC_EDISKLESS;
+   else if (hdf_file == NC_HDF4_FILE)
+       res = nc4_open_hdf4_file(path, mode, nc_file);
 #endif /* USE_HDF4 */
-      else /* netcdf */
-      {
+   else
          assert(0); /* should never happen */
-      }
-   }
 
    return res;
 }
@@ -2917,7 +2980,7 @@ sync_netcdf4_file(NC_HDF5_FILE_INFO_T *h5)
       /* Turn define mode off. */
       h5->flags ^= NC_INDEF;
 
-      /* Redef mode needs to be tracked seperately for nc_abort. */
+      /* Redef mode needs to be tracked separately for nc_abort. */
       h5->redef = NC_FALSE;
    }
 
@@ -3015,7 +3078,7 @@ close_netcdf4_file(NC_HDF5_FILE_INFO_T *h5, int abort)
    else
 #endif /* USE_HDF4 */
    {
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
       /* Free the MPI Comm & Info objects, if we opened the file in parallel */
       if(h5->parallel)
       {
@@ -3204,6 +3267,35 @@ NC4_inq(int ncid, int *ndimsp, int *nvarsp, int *nattsp, int *unlimdimidp)
    return NC_NOERR;
 }
 
+#if 0
+int
+NC4_set_content(int ncid, size_t size, void* memory)
+{
+    int retval = NC_NOERR;
+    herr_t herr;
+    NC *nc;
+    NC_HDF5_FILE_INFO_T *h5;
+    NC_GRP_INFO_T *grp;
+
+    LOG((4,"%s: ncid 0x%x size %ld memory 0x%x", __func__, ncid, size, memory));
+
+    /* Find file metadata. */
+    if ((retval = nc4_find_nc_grp_h5(ncid, &nc, &grp, &h5)))
+	return retval;
+    assert(h5 && grp && nc);
+
+#ifdef USE_DISKLESS
+    herr = H5Pset_file_image(h5->hdfid,memory,size);
+    if(herr)
+	BAIL(NC_EHDFERR);
+#else
+    retval = NC_EDISKLESS;
+#endif    				
+
+done:
+    return retval;
+}
+#endif
 
 /* This function will do the enddef stuff for a netcdf-4 file. */
 int
@@ -3219,7 +3311,7 @@ nc4_enddef_netcdf4_file(NC_HDF5_FILE_INFO_T *h5)
    /* Turn define mode off. */
    h5->flags ^= NC_INDEF;
 
-   /* Redef mode needs to be tracked seperately for nc_abort. */
+   /* Redef mode needs to be tracked separately for nc_abort. */
    h5->redef = NC_FALSE;
 
    return sync_netcdf4_file(h5);
@@ -3236,10 +3328,10 @@ nc_exit()
 }
 #endif /* EXTRA_TESTS */
 
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
 int
 nc_use_parallel_enabled()
 {
    return 0;
 }
-#endif /* USE_PARALLEL */
+#endif /* USE_PARALLEL4 */

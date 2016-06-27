@@ -47,6 +47,11 @@ gen_netcdf(const char *filename)
     ngrps = listlength(grpdefs);
 #endif /*USE_NETCDF4*/
 
+    /* Turn on logging */
+#ifdef LOGGING
+    nc_set_log_level(ncloglevel);
+#endif
+
     /* create netCDF file, uses NC_CLOBBER mode */
     cmode_modifier |= NC_CLOBBER;
 #ifdef USE_NETCDF4
@@ -255,7 +260,8 @@ Generate type definitions
 static void
 genbin_deftype(Symbol* tsym)
 {
-    int i,stat;
+    unsigned long i;
+    int stat;
 
     ASSERT(tsym->objectclass == NC_TYPE);
     switch (tsym->subclass) {
@@ -321,7 +327,7 @@ genbin_deftype(Symbol* tsym)
 				efield->typ.basetype->ncid);
 	    } else {
 		int j;
-		int dimsizes[NC_MAX_VAR_DIMS];
+		int dimsizes[NC_MAX_VAR_DIMS]; /* int because inside compound */
 		/* Generate the field dimension constants*/
 		for(j=0;j<efield->typ.dimset.ndims;j++) {
 		     unsigned int size = efield->typ.dimset.dimsyms[j]->dim.declsize;
@@ -439,24 +445,30 @@ genbin_writeattr(Generator* generator, Symbol* asym, Bytebuffer* databuf,
 
     /* Use the specialized put_att_XX routines if possible*/
     if(isprim(basetype->typ.typecode)) {
-	switch (basetype->typ.typecode) {
-            case NC_BYTE: {
-                signed char* data = (signed char*)bbContents(databuf);
-                stat = nc_put_att_schar(grpid,varid,asym->name,typid,len,data);
-                check_err(stat,__LINE__,__FILE__);
-            } break;
-            case NC_CHAR: {
-                char* data = (char*)bbContents(databuf);
+      switch (basetype->typ.typecode) {
+      case NC_BYTE: {
+        signed char* data = (signed char*)bbContents(databuf);
+        stat = nc_put_att_schar(grpid,varid,asym->name,typid,len,data);
+        check_err(stat,__LINE__,__FILE__);
+      } break;
+      case NC_CHAR: {
+        char* data = (char*)bbContents(databuf);
 		size_t slen = bbLength(databuf);
 		/* Revise length if slen == 0 */
-		if(slen == 0) {bbAppend(databuf,'\0'); slen++;}
-                stat = nc_put_att_text(grpid,varid,asym->name,slen,data);
-                check_err(stat,__LINE__,__FILE__);
-            } break;
-            case NC_SHORT: {
-                short* data = (short*)bbContents(databuf);
-                stat = nc_put_att_short(grpid,varid,asym->name,typid,len,data);
-                check_err(stat,__LINE__,__FILE__);
+		if(slen == 0) {
+          bbAppend(databuf,'\0');
+          /* bbAppend frees the memory pointed to by char* data,
+             so re-assign.  See Coverity issue: 1265731.*/
+          data = (char*)bbContents(databuf);
+          slen++;
+        }
+        stat = nc_put_att_text(grpid,varid,asym->name,slen,data);
+        check_err(stat,__LINE__,__FILE__);
+      } break;
+      case NC_SHORT: {
+        short* data = (short*)bbContents(databuf);
+        stat = nc_put_att_short(grpid,varid,asym->name,typid,len,data);
+        check_err(stat,__LINE__,__FILE__);
             } break;
             case NC_INT: {
                 int* data = (int*)bbContents(databuf);

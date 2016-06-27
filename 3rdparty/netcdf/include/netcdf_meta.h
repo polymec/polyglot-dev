@@ -22,9 +22,9 @@
 #define NETCDF_META_H
 
 #define NC_VERSION_MAJOR 4 /*!< netcdf-c major version. */
-#define NC_VERSION_MINOR 3 /*!< netcdf-c minor version. */
-#define NC_VERSION_PATCH 3 /*!< netcdf-c patch version. */
-#define NC_VERSION_NOTE  ".1" /*!< netcdf-c note. May be blank. */
+#define NC_VERSION_MINOR 4 /*!< netcdf-c minor version. */
+#define NC_VERSION_PATCH 0 /*!< netcdf-c patch version. */
+#define NC_VERSION_NOTE  "" /*!< netcdf-c note. May be blank. */
 
 /*! netcdf-c version string.
  *
@@ -35,13 +35,13 @@
  * Note that the trailing NC_VERSION_NOTE may be empty. It serves for
  * identifiers such as '-rc1', etc.
  */
-#define NC_VERSION       "4.3.3.1"
+#define NC_VERSION       "4.4.0"
 
 #define NC_HAS_NC2       1 /*!< API version 2 support. */
 #define NC_HAS_NC4       1 /*!< API version 4 support. */
 #define NC_HAS_HDF4      0 /*!< hdf4 support. */
 #define NC_HAS_HDF5      1 /*!< hdf5 support. */
-#define NC_HAS_SZIP      0 /*!< szip support (hdf5 only) */
+#define NC_HAS_SZIP      1 /*!< szip support (hdf5 only) */
 #define NC_HAS_DAP       1 /*!< DAP support. */
 #define NC_HAS_DISKLESS  1 /*!< diskless support. */
 #define NC_HAS_MMAP      0 /*!< mmap support. */

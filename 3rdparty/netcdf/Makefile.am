@@ -9,7 +9,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
 # These files get added to the distribution.
-EXTRA_DIST = README.md COPYRIGHT INSTALL INSTALL.cmake test_prog.c \
+EXTRA_DIST = README.md COPYRIGHT INSTALL.md test_prog.c \
 	lib_flags.am cmake CMakeLists.txt COMPILE.cmake.txt \
 	config.h.cmake.in cmake_uninstall.cmake.in \
 	FixBundle.cmake.in \
@@ -64,7 +64,7 @@ endif
 
 # Build pnetcdf
 if USE_PNETCDF
-LIBSRC5 = libsrc5
+LIBSRCP = libsrcp
 endif
 
 # Build UDUNITS?
@@ -86,7 +86,7 @@ endif
 # and run. ncgen must come before ncdump, because their tests
 # depend on it.
 SUBDIRS = include $(OCLIB) $(H5_TEST_DIR) libdispatch libsrc		\
-$(LIBSRC4_DIR) $(DAP2) $(LIBCDMR) $(LIBSRC5) liblib  \
+$(LIBSRC4_DIR) $(DAP2) $(LIBCDMR) $(LIBSRCP) liblib  \
 $(NCGEN3) $(NCGEN) $(NCDUMP) \
 $(TESTDIRS) \
 docs $(EXAMPLES) \
@@ -121,6 +121,21 @@ endif # BUILD_DLL
 # install libnetcdf.settings in lib directory.
 settingsdir=$(libdir)
 settings_DATA=libnetcdf.settings
+
+####
+# Provide an entry to rebuild all the m4 generated files
+# List of files to create: WARNING leave off the extension
+####
+
+MM4= ./nc_test/test_put ./nc_test/test_get \
+     ./libsrc/netcdf ./libsrc/putget ./libsrc/ncx \
+     ./libsrc/t_ncxx ./libsrc/attr
+
+mm4::
+	for m in ${MM4} ; do \
+	  b=`basename $$m` ; d=`dirname $$m`;\
+	  pushd $$d; m4 -s $${b}.m4 > $${b}.c ; popd; done
+
 
 #####
 # If ENABLE_FORTRAN was turned on,
@@ -176,7 +191,7 @@ install-data-hook:
 #endif
 
 if BUILD_DLL
-	cp liblib/netcdfdll.def $(DESTDIR)${prefix}/lib
+	cp liblib/netcdfdll.def $(DESTDIR)${prefix}/bin
 endif # BUILD_DLL
 	@echo ''
 	@echo '+-------------------------------------------------------------+'

@@ -39,8 +39,10 @@ extern void	verror ( const char *fmt, ... )
 #endif
 ;
 
-
 extern void markcdf4(const char *msg);
+extern char* getmarkcdf4(void);
+
+extern void markcdf5(const char *msg);
 extern char* getmarkcdf4(void);
 
 
@@ -95,13 +97,6 @@ extern  Symbol* locate(Symbol* refsym);
 extern  Symbol* lookup(nc_class objectclass, Symbol* pattern);
 extern  Symbol* lookupingroup(nc_class objectclass, char* name, Symbol* grp);
 extern  Symbol* lookupgroup(List* prefix);
-#ifndef NO_STDARG
-extern  void semerror(const int, const char *fmt, ...);
-extern  void semwarn(const int, const char *fmt, ...);
-#else
-extern  void semerror(lno,fmt,va_alist) const int lno; const char* fmt; va_dcl;
-extern  void semwarnlno,fmt,va_alist) const int lno; const char* fmt; va_dcl;
-#endif
 extern int nounlimited(Dimset* dimset, int from);
 extern int lastunlimited(Dimset* dimset);
 extern void padstring(NCConstant* con, size_t desiredlength, int fillchar);
@@ -156,11 +151,15 @@ extern void jflush(void);
 
 
 /* from: main.c */
+extern int k_flag;    /* -k value from command line*/
 extern int format_flag;   /* _Format attribute value (same range as -k flag) */
 extern int format_attribute; /* 1 if format came from _FORMAT attribute */
 extern int enhanced_flag; /* 1 => netcdf-4 constructs appear in the parse */
+extern int cdf5_flag; /* 1 => cdf-5 unsigned types in the parse */
 extern int specials_flag; /* 1 => special attributes are present */
-extern int usingclassic;   /* 1 => k_flag == 1|2 */
+extern int usingclassic;   /* 1 => k_flag == 1|2|5 */
+extern int k_flag;
+extern int ncloglevel;
 
 /* Global data */
 

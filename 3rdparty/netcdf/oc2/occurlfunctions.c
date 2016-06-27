@@ -213,6 +213,7 @@ ocset_flags_perlink(OCstate* state)
 {
     OCerror stat = OC_NOERR;
 
+    /* Following are always set */
     if(stat == OC_NOERR) stat = ocset_curlflag(state,CURLOPT_ENCODING);
     if(stat == OC_NOERR) stat = ocset_curlflag(state,CURLOPT_NETRC);
     if(stat == OC_NOERR) stat = ocset_curlflag(state,CURLOPT_VERBOSE);
@@ -222,16 +223,12 @@ ocset_flags_perlink(OCstate* state)
     if(stat == OC_NOERR) stat = ocset_curlflag(state,CURLOPT_USERPWD);
     if(stat == OC_NOERR) stat = ocset_curlflag(state,CURLOPT_PROXY);
     if(stat == OC_NOERR) stat = ocset_curlflag(state,CURLOPT_USE_SSL);
-    if(stat != OC_NOERR)
-      return stat;
-
-    /* Following are always set */
-    ocset_curlflag(state, CURLOPT_FOLLOWLOCATION);
-    ocset_curlflag(state, CURLOPT_MAXREDIRS);
-    ocset_curlflag(state, CURLOPT_ERRORBUFFER);
+    if(stat == OC_NOERR) stat = ocset_curlflag(state, CURLOPT_FOLLOWLOCATION);
+    if(stat == OC_NOERR) stat = ocset_curlflag(state, CURLOPT_MAXREDIRS);
+    if(stat == OC_NOERR) stat = ocset_curlflag(state, CURLOPT_ERRORBUFFER);
 
     /* Set the CURL. options */
-    stat = oc_set_curl_options(state);
+    if(stat == OC_NOERR) stat = oc_set_curl_options(state);
 
     return stat;
 }
@@ -252,10 +249,10 @@ oc_set_curl_options(OCstate* state)
     hostport = occombinehostport(state->uri);
     if(hostport == NULL) {
       hostport = (char*)malloc(sizeof(char)*1);
-      *hostport = "";
+      *hostport = '\0';
     }
 
-    store = &ocglobalstate.rc.ocrc;
+    store = &ocglobalstate.rc.daprc;
     triple = store->triples;
 
     /* Assume that the triple store has been properly sorted */
@@ -275,7 +272,7 @@ oc_set_curl_options(OCstate* state)
         stat = ocset_curlopt(state,ocflag->flag,cvt(triple->value,ocflag->type));
     }
  done:
-    if(hostport && strcmp(hostport,"") != 0) free(hostport);
+    if(hostport && strlen(hostport) > 0) free(hostport);
     return stat;
 }
 

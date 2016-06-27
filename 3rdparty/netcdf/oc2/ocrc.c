@@ -13,6 +13,8 @@
 #include "ocdebug.h"
 #include "oclog.h"
 
+#define OCRCFILEENV "DAPRCFILE"
+
 #define RTAG ']'
 #define LTAG '['
 
@@ -27,7 +29,7 @@ static char* combinecredentials(const char* user, const char* pwd);
 static void storedump(char* msg, struct OCTriple*, int ntriples);
 
 /* Define default rc files and aliases, also defines search order*/
-static char* rcfilenames[] = {".ocrc",".dodsrc",NULL};
+static char* rcfilenames[] = {".daprc",".dodsrc",NULL};
 
 /* The Username and password are in the URL if the URL is of the form:
  * http://<name>:<passwd>@<host>/....
@@ -123,8 +125,10 @@ static void
 rctrim(char* text)
 {
     char* p = text;
-    size_t len = 0;
+    size_t len;
     int i;
+
+    len = strlen(text);
     /* locate first non-trimchar */
     for(;*p;p++) {
        if(strchr(TRIMCHARS,*p) == NULL) break; /* hit non-trim char */
@@ -270,7 +274,7 @@ ocrc_compile(const char* path)
     char line0[MAXRCLINESIZE+1];
     FILE *in_file = NULL;
     int linecount = 0;
-    struct OCTriplestore* ocrc = &ocglobalstate.rc.ocrc;
+    struct OCTriplestore* ocrc = &ocglobalstate.rc.daprc;
 
     ocrc->ntriples = 0; /* reset; nothing to free */
 
@@ -297,7 +301,7 @@ ocrc_compile(const char* path)
 	if(strlen(line) == 0) continue;
         if(strlen(line) >= MAXRCLINESIZE) {
             oclog(OCLOGERR, "%s line too long: %s",path,line0);
-            return 0;
+            continue; /* ignore it */
         }
         /* setup */
         ocrc->triples[ocrc->ntriples].host[0] = '\0';
@@ -347,7 +351,7 @@ ocrc_compile(const char* path)
         ocrc->ntriples++;
     }
     fclose(in_file);
-    sorttriplestore(&ocglobalstate.rc.ocrc);
+    sorttriplestore(&ocglobalstate.rc.daprc);
     return 1;
 }
 
@@ -364,10 +368,16 @@ ocrc_load(void)
     }
     if(ocglobalstate.rc.loaded) return OC_NOERR;
 
-    /* locate the configuration files: first if specified,
-       then '.',  then $HOME */
+    /* locate the configuration files in the following order:
+       1. specified by set_rcfile
+       2. set by DAPRCFILE env variable
+       3. '.'
+       4. $HOME
+    */
     if(ocglobalstate.rc.rcfile != NULL) { /* always use this */
-	path = ocglobalstate.rc.rcfile;
+	path = strdup(ocglobalstate.rc.rcfile);
+    } else if(getenv(OCRCFILEENV) != NULL && strlen(getenv(OCRCFILEENV)) > 0) {
+        path = strdup(getenv(OCRCFILEENV));
     } else {
 	char** rcname;
 	int found = 0;
@@ -398,10 +408,10 @@ done:
     return stat;
 }
 
-int
+OCerror
 ocrc_process(OCstate* state)
 {
-    int stat = 0;
+    OCerror stat = OC_NOERR;
     char* value = NULL;
     OCURI* uri = state->uri;
     char* url_userpwd = NULL;
@@ -559,7 +569,7 @@ static struct OCTriple*
 ocrc_locate(char* key, char* hostport)
 {
     int i,found;
-    struct OCTriplestore* ocrc = &ocglobalstate.rc.ocrc;
+    struct OCTriplestore* ocrc = &ocglobalstate.rc.daprc;
     struct OCTriple* triple;
 
     if(ocglobalstate.rc.ignore)
@@ -601,7 +611,7 @@ static void
 storedump(char* msg, struct OCTriple* triples, int ntriples)
 {
     int i;
-    struct OCTriplestore* ocrc = &ocglobalstate.rc.ocrc;
+    struct OCTriplestore* ocrc = &ocglobalstate.rc.daprc;
 
     if(msg != NULL) fprintf(stderr,"%s\n",msg);
     if(ocrc == NULL) {

@@ -31,7 +31,7 @@ static struct {
  *         omitted, in which case it is assumed to be the entire
  *         dimension size.  That is also the default for dimensions
  *         not mentioned in the string.
- *         If the chunkspec string is "/", specifiying no dimensions or 
+ *         If the chunkspec string is "/", specifying no dimensions or 
  *         chunk sizes, it indicates chunking to be turned off on output.
  *
  * Returns NC_NOERR if no error, NC_EINVAL if spec has consecutive
@@ -109,12 +109,16 @@ chunkspec_parse(int ncid, const char *spec) {
 		if(ret != NC_NOERR)
 		    return(ret);
 		chunksize = dimlen;
-	    } else {	      /* convert nnn string to long integer */
+	    } else {	      /* convert nnn string to long long integer */
 		char *ep;
-		long val = strtol(pp, &ep, 0);
+#ifdef HAVE_STRTOLL
+		long long val = strtoll(pp, &ep, 0);
+#else
+		long long val = strtol(pp, &ep, 0);
+#endif
 		if(ep == pp || errno == ERANGE || val < 1) /* allow chunksize bigger than dimlen */
 		    return (NC_EINVAL);
-		chunksize = val;
+		chunksize = (size_t)val;
 	    }
 	    chunkspecs.chunksizes[idim] = chunksize;
 	    idim++;

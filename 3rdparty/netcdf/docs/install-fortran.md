@@ -4,15 +4,21 @@ Building the NetCDF-4.2 and later Fortran libraries {#building_netcdf_fortran}
 [TOC]
 
 In versions before 4.2, the Fortran netCDF library source was bundled
-with the C library source in one distribution, and it was possible to
-combine the libraries in a single library file. With version 4.2, the
-Fortran netCDF library for Fortran77 and Fortran90 APIs has been
-separated into its own source distribution, and should now be built as a
-separate library, after the C library is built and installed. This
-separation simplifies the building and use of the C and Fortran netCDF
-libraries and allows them to evolve independently.
+with the C library source in one distribution. With more recent
+versions, the Fortran netCDF library has been split off into an
+independent source distribution, intended to be built as a separate
+library, *after* the C library is built and installed. This separation
+simplifies the building and use of the C and Fortran netCDF libraries
+and allows them to evolve independently.
 
-Please note that in the example commands below, we assume use of a
+More recently, building netcdf-fortran as an automated step in the
+netcdf-c build is now possible (for non-MSVC builds) by using new
+options at configure time, so if you haven't built and installed the
+netCDF-C library yet, you may want to try the new netCDF-C <a
+href="http://www.unidata.ucar.edu/software/netcdf/docs/getting_and_building_netcdf.html#getting"
+>Fortran-bootstrap procedure</a>.
+
+In the example commands below, we assume use of a
 POSIX-standard shell, such as sh, bash, ksh, or zsh. If you are using
 csh instead, you will have to use the
 
@@ -22,8 +28,8 @@ syntax to set environment variables instead of the
 
        ENV_VARIABLE=value
 
-syntax used in the examples that use a POSIX-standard shell. In either
-case, <I>${DIR1}</I> is the value of the environment variable <I>DIR1</I>.
+syntax used in the examples. In either case, `${VAR}` is the
+value of the shell variable or environment variable VAR.
 
 It will be easier to build the netCDF Fortran library if the C (and if
 needed, HDF5) libraries are built as shared libraries (the default), but
@@ -33,41 +39,68 @@ Building with shared libraries {#building_fortran_shared_libraries}
 ==============================
 
 1.  First make sure the netCDF C library has been built, tested, and
-    installed under directory <I>${DIR1}</I>, as specified by
-    --prefix=<I>${DIR1}</I> to the C library configure script, or under
-    directory /usr/local by default.
-2.  For the Fortran netCDF library, use the same C compiler as used to
-    create the netCDF C library, specified with the CC environment
-    variable, if necessary.
+    installed. The shell variable NCDIR should be set such that
+    the shared library for netCDF C is under `${NCDIR}/lib` and
+    netCDF utilities such as ncdump are under `${NCDIR}/bin`. For example:
+
+        NCDIR=/usr/local
+    
+2.  The configure script will try to determine suitable Fortran and C
+    compilers for building netCDF Fortran, but you can instead specify
+    them with the FC and CC environment variables, if needed. For
+    example:
+
+		CC=/usr/local/cc
+		FC=/usr/local/fortran
+    
 3.  If the netCDF C library was installed as a shared library in a
     location that is not searched by default, you will need to set the
     LD\_LIBRARY\_PATH environment variable (or DYLD\_LIBRARY\_PATH on
-    OSX) to specify that directory before running the configure script,
-    for example:
+    OSX) to specify that directory before running the configure script.
+    For example:
 
-        export LD_LIBRARY_PATH=${DIR1}/lib:${LD_LIBRARY_PATH}
+        export LD_LIBRARY_PATH=${NCDIR}/lib:${LD_LIBRARY_PATH}
 
 4.  If you set the LD\_LIBRARY\_PATH (or DYLD\_LIBRARY\_PATH)
-    environment variable in the previous step, don't use the "sudo"
-    command before the following "configure" or "make check" commands.
-    Using "sudo" causes the LD\_\* environment variables to be ignored,
-    as a security precaution. You can use "sudo make install" as the
-    last step, but you shouldn't need to use "sudo" before that.
-5.  For the configure script, set CPPFLAGS and LDFLAGS variables to
-    specify the include and lib directories for the netCDF C library.
-    For example, to install the Fortran libraries in the same directory
-    *\${DIR1}* where the C netCDF library is installed:
+    environment variable in the previous step, don't use "sudo"
+    before the following "configure" or "make check" commands.
+    Using "sudo" causes the LD\_\* environment variables to be
+    ignored. You can use "sudo make install" as the last
+    step if necessary, but don't use "sudo" before that.
+    
+5.  Set the shell variable `NFDIR` to where you want to install
+    netCDF Fortran, which can be the same location where the netCDF C
+    was installed (default /usr/local), but **not** the source
+    directory where you are building the software.  Then, from the top-level
+    source directory, run the configure script, using CPPFLAGS and LDFLAGS to
+    specify where the netCDF C library was installed:
 
-          CPPFLAGS=-I${DIR1}/include LDFLAGS=-L${DIR1}/lib ./configure --prefix=${DIR1}
+		NFDIR=/usr/local
+        CPPFLAGS=-I${NCDIR}/include LDFLAGS=-L${NCDIR}/lib \
+		./configure --prefix=${NFDIR}
 
     If you are cross-compiling, you should also include the configure
     option "--disable-fortran-type-check", as in:
 
-          CPPFLAGS=-I${DIR1}/include LDFLAGS=-L${DIR1}/lib \
-            ./configure --disable-fortran-type-check --prefix=${DIR1}
+        CPPFLAGS=-I${NCDIR}/include LDFLAGS=-L${NCDIR}/lib \
+        ./configure --prefix=${NFDIR} --disable-fortran-type-check
 
-6.  If that succeeds, run "make check".
-7.  If that succeeds, run "make install" or "sudo make install".
+	To see other configure options, run `configure --help`.
+
+6.  If that succeeds, run
+
+		make check
+
+7.  If that succeeds, run
+
+		make install
+
+	or
+
+		sudo make install
+
+If you encounter problems, send the complete "config.log" file
+generated by running configure to support-netcdf@unidata.ucar.edu.
 
 Building with static libraries {#building_fortran_with_static_libraries}
 ==============================
@@ -76,115 +109,121 @@ If you can't build the C netCDF library as a shared library or if it has
 already been installed by someone else only as a static library (which
 means there are no libnetcdf.so files in the library directory where the
 netCDF C library was installed), then building and installing the
-Fortran netCDF libraries will be somewhat more complicated.
+Fortran netCDF libraries will be more complicated.
+    
+1.  The configure script will try to determine suitable Fortran and C
+    compilers for building netCDF Fortran, but you can also, specify
+    them with the FC and CC environment variables.
 
-If you need to set the LD\_LIBRARY\_PATH (or DYLD\_LIBRARY\_PATH)
-environment variable, don't use the "sudo" command before the following
-"configure" or "make check" commands. Using "sudo" causes the LD\_\*
-environment variables to be ignored. You can use "sudo make install" as
-the last step, but you shouldn't need to use "sudo" before that.
+2.  Assume the static netCDF C library is installed under `${NCDIR}`,
+    the HDF5 library under `${H5DIR}`, and other needed libraries
+    such as zlib and curl under `${ODIR}`. Some or all of these could
+    be the same (for example /usr/local).
 
-1.  Assume the static netCDF C library is installed under *\${DIR1}*,
-    and the other needed shared libraries for HDF5, zlib, and curl are
-    installed under *\${DIR2}* (which might be the same as *\${DIR1}*).
-2.  Use the same C compiler as used to create the netCDF C library,
-    specified with the CC environment variable, if necessary.
-3.  Set the CPPFLAGS, LDFLAGS, and LD\_LIBRARY\_PATH environment
+3.  Let the shell variable `${NFDIR}` specify where you want to
+    install the netCDF Fortran library.  This can be the same location
+    where the netCDF C library is installed (default is /usr/local).
+
+4.  Set the CPPFLAGS, LDFLAGS, LD\_LIBRARY\_PATH, and LIBS environment
     variables to specify where the netCDF C library is installed and
-    where the other shared libraries may be found, before running the
-    configure script. For example:
+    where the other libraries may be found. For example:
 
-          CPPFLAGS="-I${DIR1}/include -I${DIR2}/include" \
-          LD_LIBRARY_PATH=${DIR1}/lib:${DIR2}/lib:${LD_LIBRARY_PATH} \
-          LDFLAGS="-L${DIR1}/lib -L${DIR2}/lib" \
-          LIBS="-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl" \
-          ./configure --disable-shared --prefix=${DIR1}
+        CPPFLAGS="-I${NCDIR}/include -I${H5DIR}/include -I${ODIR}/include" \
+        LDFLAGS="-L${NCDIR}/lib -L${H5DIR}/lib -L${ODIR}/lib" \
+        LD_LIBRARY_PATH=${NCDIR}/lib:${H5DIR}/lib:${ODIR}/lib \
+        LIBS="-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl" \
+        ./configure --disable-shared --prefix=${NCDIR}
 
     If you are cross-compiling, you should also include the configure
     option "--disable-fortran-type-check".
 
-4.  For parallel I/O: The configure script sets CFLAGS appropriately for
+5.  For parallel I/O: The configure script sets CFLAGS appropriately for
     standard compilers, but if you are building with parallel I/O using
-    wrappers such as mpicc and mpif90, you sometimes have to set CFLAGS
-    to indicate which Fortran compiler is wrapped by mpif90. For
-    example, if "mpicc --show" and "mpif90 --show" indicate gcc and
-    gfortran are being used, then set CFLAGS=-DgFortran, and similarly
-    set CFLAGS=-DpgiFortran for Portland Group compilers.
-5.  If that succeeds, run "make check".
-6.  If that succeeds, run "make install" or "sudo make install".
+    wrappers such as mpicc, mpif90, and mpif77, specify compilers
+    using the CC, FC, and F77 variables before configure.  For example:
+
+        CC=mpicc FC=mpif90 F77=mpif77 CPPFLAGS=-I${NCDIR}/include \
+        LDFLAGS=-L${NCDIR}/lib ./configure --prefix=${NFDIR}
+
+    You may have to use absolute path names for CC, F90, and F77 if
+	configure can't find them. Finally, you may also need to set
+	CFLAGS to indicate which Fortran compiler is wrapped by mpif90 nd
+	mpif77. For example, if "mpif90 --show" indicates gfortran is
+	being used, then set CFLAGS=-DgFortran, and similarly set
+	CFLAGS=-DpgiFortran for Portland Group compilers.
+
+6.  If that succeeds, run "make check".
+
+7.  If that succeeds, run "make install" or "sudo make install".
+
+If you encounter problems, send the complete "config.log" file
+generated by running configure to support-netcdf@unidata.ucar.edu.
 
 Linking your programs with netCDF Fortran libraries {#linking_against_netcdf_fortran}
 ==============================
 
 If you built the shared libraries, you can link with something like
 
-       fortran_compiler my_prog.f -o my_prog -I${DIR1}/include -L${DIR1}/lib -lnetcdff
+    fortran my_prog.f -o my_prog -I${NFDIR}/include -L${NFDIR}/lib -lnetcdff
 
 to link your Fortran software with the installed netCDF Fortran and C
-libraries. If you didn't install the shared libraries in a standard
-place, you may need to set LD\_LIBRARY\_PATH (or DYLD\_LIBRARY\_PATH for
-OSX) before running the resulting program.
+libraries.
+
+If you didn't install the shared libraries in a standard place, you
+may need to set LD\_LIBRARY\_PATH (or DYLD\_LIBRARY\_PATH for OSX) to
+include `${NFDIR}/lib` before running the resulting
+program. Alternatively, you may add `${NFDIR}/lib` to the
+LD\_RUN\_PATH environment variable before linking, or use the
+`-Wl,-rpath -Wl,${NFDIR}/lib` linker flag, or have your system
+administrator add `${NFDIR}/lib` to `/etc/ld.so.conf'.  See
+operating system documentation about shared libraries for more
+information, such as the ld(1) and ld.so(8) manual pages.
 
 If you built static libraries, you will need to use something like
 
-       fortran_compiler my_prog.f -o my_prog -I${DIR1}/include \
-        -L${DIR1}/lib -lnetcdff -lnetcdf -L${DIR2}/lib -lhdf5_hl -lhdf5 -lz -lcurl -lm
+    fortran my_prog.f -o my_prog -I${NFDIR}/include \
+    -L${NCDIR}/lib -lnetcdff -lnetcdf \
+	-L${H5DIR}/lib -lhdf5_hl -lhdf5 -L${ODIR} -lz -lcurl -lm
 
 to link Fortran software with the installed Fortran library and the
 libraries on which it depends.
 
 A simpler alternative that should work for either shared or static
-libraries is to use the "nf-config" utility installed in *${DIR1}*/bin:
+libraries is to use the "nf-config" utility installed in `${NFDIR}/bin`:
 
-       `nf-config --fc` my_prog.f -o my_prog `nf-config --fflags --flibs`
+	fortran my_prog.f -o my_prog `nf-config --fflags --flibs`
 
 or the more general "pkg-config" utility, if you have it:
 
-       fortran_compiler my_prog.f -o my_prog `pkg-config --cflags --libs netcdf-fortran`
-       
+	fortran my_prog.f -o my_prog `pkg-config --cflags --libs netcdf-fortran`
 
 Specifying The Environment for Building {#specify_build_env_fortran}
 ========================================
 
-
-The netCDF configure script searches your path to find the compilers and tools it needed. To use compilers that can't be found in your path, set their environment variables.
-
-The configure script will use gcc and associated GNU tools if they are found. Many users, especially those with performance concerns, will wish to use a vendor supplied compiler.
-
-For example, on an AIX system, users may wish to use xlc (the AIX compiler) in one of its many flavors. Set environment variables before the build to achieve this.
-
-For example, to change the C compiler, set CC to xlc (in sh: export CC=xlc). (But don't forget to also set CXX to xlC, or else configure will try to use g++, the GNU C++ compiler to build the netCDF C++ API. Similarly set FC to xlf90 so that the Fortran APIs are built properly.)
-
-By default, the netCDF library is built with assertions turned on. If you wish to turn off assertions, set CPPFLAGS to -DNDEBUG (csh ex: setenv CPPFLAGS -DNDEBUG).
-
-If GNU compilers are used, the configure script sets CPPFLAGS to “-g -O2”. If this is not desired, set CPPFLAGS to nothing, or to whatever other value you wish to use, before running configure.
-
 For cross-compiles, the following environment variables can be used to override the default fortran/C type settings like this (in sh):
 
-     export NCBYTE_T=''integer(selected_int_kind(2))''
-     export NCSHORT_T=''integer*2''
-     export NF_INT1_T=''integer(selected_int_kind(2))''
-     export NF_INT2_T=''integer*2''
+     export NCBYTE_T="integer(selected_int_kind(2))"
+     export NCSHORT_T="integer*2"
+     export NF_INT1_T="integer(selected_int_kind(2))"
+     export NF_INT2_T="integer*2"
      export NF_INT1_IS_C_SHORT=1
      export NF_INT2_IS_C_SHORT=1
      export NF_INT_IS_C_INT=1
      export NF_REAL_IS_C_FLOAT=1
      export NF_DOUBLEPRECISION_IS_C_DOUBLE=1
      
-In this case you will need to run configure with –disable-fortran-compiler-check and –disable-fortran-type-check.
+In this case you will need to run configure with `–disable-fortran-compiler-check` and `–disable-fortran-type-check`.
 
-Variable Description Notes
+Environment Variable Description Notes
 --------------------------
 
 Variable | Usage | Description
 ---|---|---
 CC	| C compiler	| If you don't specify this, the configure script will try to find a suitable C compiler. The default choice is gcc. If you wish to use a vendor compiler you must set CC to that compiler, and set other environment variables (as described below) to appropriate settings.
-FC	| Fortran compiler (if any)| 	If you don't specify this, the configure script will try to find a suitable Fortran and Fortran 77 compiler. Set FC to "" explicitly, or provide the –disable-f77 option to configure, if no Fortran interface (neither F90 nor F77) is desired. Use –disable-f90 to disable the netCDF Fortran 90 API, but build the netCDF Fortran 77 API.
-F77	| Fortran 77 compiler (if any)	| Only specify this if your platform explicitly needs a different Fortran 77 compiler. Otherwise use FC to specify the Fortran compiler. If you don't specify this, the configure script will try to find a suitable Fortran compiler. For vendor compilers, make sure you're using the same vendor's Fortran 90 compiler. Using Fortran compilers from different vendors, or mixing vendor compilers with g77, the GNU F77 compiler, is not supported and may not work.
-CXX	| C++ compiler	| If you don't specify this, the configure script will try to find a suitable C++ compiler. Set CXX to "" explicitly, or use the –disable-cxx configure option, if no C++ interface is desired. If using a vendor C++ compiler, use that vendor's C compiler to compile the C interface. Using different vendor compilers for C and C++ may not work.
-CFLAGS	| C compiler flags	| "-O" or "-g", for example.
+FC	| Fortran compiler (if any) | 	If you don't specify this, the configure script will try to find a suitable Fortran and Fortran 77 compiler. Use –disable-f90 to disable the netCDF Fortran 90 API, but build the netCDF Fortran 77 API.
+F77	| Fortran 77 compiler (if any)	| Only specify this if your platform explicitly needs a different Fortran 77 compiler. Otherwise use FC to specify the Fortran compiler. If you don't specify this, the configure script will try to find a suitable Fortran compiler. For vendor compilers, make sure you're using the same vendor's Fortran 90 compiler. Using Fortran compilers from different vendors is not supported and may not work.
+CFLAGS	| C compiler flags	| "-O -g2", for example.
 CPPFLAGS	| C preprocessor options	| "-DNDEBUG" to omit assertion checks, for example.
 FCFLAGS| 	Fortran 90 compiler flags	| "-O" or "-g", for example. These flags will be used for FORTRAN 90. If setting these you may also need to set FFLAGS for the FORTRAN 77 test programs.
 FFLAGS	| Fortran 77 compiler flags	| "-O" or "-g", for example. If you need to pass the same arguments to the FORTRAN 90 build, also set FCFLAGS.
-CXXFLAGS	| C++ compiler flags	| "-O" or "-g", for example.
-ARFLAGS, NMFLAGS, FPP, M4FLAGS, LIBS, FLIBS, FLDFLAGS	| Miscellaneous	| One or more of these were needed for some platforms, as specified below. Unless specified, you should not set these environment variables, because that may interfere with the configure script. 
+ARFLAGS, NMFLAGS, FPP, M4FLAGS, LIBS, FLIBS, FLDFLAGS	| Miscellaneous	| One or more of these may be needed for some platforms. Unless required, you should not set these environment variables, because that may interfere with the configure script. 

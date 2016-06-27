@@ -19,8 +19,8 @@
 #include <H5DSpublic.h>
 #include <math.h>
 
-#if 0 /*def USE_PNETCDF*/
-#include <pnetcdf.h>
+#ifdef USE_PARALLEL
+#include "netcdf_par.h"
 #endif
 
 #define NC3_STRICT_ATT_NAME "_nc3_strict"
@@ -293,6 +293,8 @@ nc4_get_hdf_typeid(NC_HDF5_FILE_INFO_T *h5, nc_type xtype,
             return NC_EHDFERR;
           if (H5Tset_strpad(typeid, H5T_STR_NULLTERM) < 0)
             BAIL(NC_EVARMETA);
+	  if(H5Tset_cset(typeid, H5T_CSET_UTF8) < 0)
+	    BAIL(NC_EVARMETA);
 
           /* Take ownership of the newly created HDF5 datatype */
           *hdf_typeid = typeid;
@@ -304,6 +306,8 @@ nc4_get_hdf_typeid(NC_HDF5_FILE_INFO_T *h5, nc_type xtype,
             return NC_EHDFERR;
           if (H5Tset_size(typeid, H5T_VARIABLE) < 0)
             BAIL(NC_EVARMETA);
+	  if(H5Tset_cset(typeid, H5T_CSET_UTF8) < 0)
+	    BAIL(NC_EVARMETA);
 
           /* Take ownership of the newly created HDF5 datatype */
           *hdf_typeid = typeid;
@@ -480,7 +484,7 @@ log_dim_info(NC_VAR_INFO_T *var, hsize_t *fdims, hsize_t *fmaxdims,
 }
 #endif /* LOGGING */
 
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
 static int
 set_par_access(NC_HDF5_FILE_INFO_T *h5, NC_VAR_INFO_T *var, hid_t xfer_plistid)
 {
@@ -657,8 +661,9 @@ nc4_put_vara(NC *nc, int ncid, int varid, const size_t *startp,
       /* If we're reading, we need bufr to have enough memory to store
        * the data in the file. If we're writing, we need bufr to be
        * big enough to hold all the data in the file's type. */
-      if (!(bufr = malloc(len * file_type_size)))
-        BAIL(NC_ENOMEM);
+      if(len > 0)
+        if (!(bufr = malloc(len * file_type_size)))
+          BAIL(NC_ENOMEM);
     }
   else
 #endif /* ifndef HDF5_CONVERT */
@@ -686,7 +691,7 @@ nc4_put_vara(NC *nc, int ncid, int varid, const size_t *startp,
     BAIL(NC_EHDFERR);
 #endif
 
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
   /* Set up parallel I/O, if needed. */
   if ((retval = set_par_access(h5, var, xfer_plistid)))
     BAIL(retval);
@@ -724,7 +729,7 @@ nc4_put_vara(NC *nc, int ncid, int varid, const size_t *startp,
             }
         }
 
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
       /* Check if anyone wants to extend */
       if (h5->parallel && NC_COLLECTIVE == var->parallel_access)
         {
@@ -734,14 +739,14 @@ nc4_put_vara(NC *nc, int ncid, int varid, const size_t *startp,
           if(MPI_SUCCESS != MPI_Allreduce(MPI_IN_PLACE, &need_to_extend, 1, MPI_INT, MPI_BOR, h5->comm))
             BAIL(NC_EMPI);
         }
-#endif /* USE_PARALLEL */
+#endif /* USE_PARALLEL4 */
 
       /* If we need to extend it, we also need a new file_spaceid
          to reflect the new size of the space. */
       if (need_to_extend)
         {
           LOG((4, "extending dataset"));
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
           if (h5->parallel)
             {
               if(NC_COLLECTIVE != var->parallel_access)
@@ -750,12 +755,12 @@ nc4_put_vara(NC *nc, int ncid, int varid, const size_t *startp,
               /* Reach consensus about dimension sizes to extend to */
               /* (Note: Somewhat hackish, with the use of MPI_INTEGER, but MPI_MAX is
                *        correct with this usage, as long as it's not executed on
-               *        heterogenous systems)
+               *        heterogeneous systems)
                */
               if(MPI_SUCCESS != MPI_Allreduce(MPI_IN_PLACE, &xtend_size, (var->ndims * (sizeof(hsize_t) / sizeof(int))), MPI_UNSIGNED, MPI_MAX, h5->comm))
                 BAIL(NC_EMPI);
             }
-#endif /* USE_PARALLEL */
+#endif /* USE_PARALLEL4 */
           if (H5Dset_extent(var->hdf_datasetid, xtend_size) < 0)
             BAIL(NC_EHDFERR);
           if (file_spaceid > 0 && H5Sclose(file_spaceid) < 0)
@@ -823,7 +828,7 @@ nc4_put_vara(NC *nc, int ncid, int varid, const size_t *startp,
   num_plists--;
 #endif
 #ifndef HDF5_CONVERT
-  if (need_to_convert) free(bufr);
+  if (need_to_convert && bufr) free(bufr);
 #endif
 
   /* If there was an error return it, otherwise return any potential
@@ -1039,8 +1044,9 @@ nc4_get_vara(NC *nc, int ncid, int varid, const size_t *startp,
           /* If we're reading, we need bufr to have enough memory to store
            * the data in the file. If we're writing, we need bufr to be
            * big enough to hold all the data in the file's type. */
-          if (!(bufr = malloc(len * file_type_size)))
-            BAIL(NC_ENOMEM);
+          if(len > 0)
+            if (!(bufr = malloc(len * file_type_size)))
+              BAIL(NC_ENOMEM);
         }
       else
 #endif /* ifndef HDF5_CONVERT */
@@ -1069,7 +1075,7 @@ nc4_get_vara(NC *nc, int ncid, int varid, const size_t *startp,
         BAIL(NC_EHDFERR);
 #endif
 
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
       /* Set up parallel I/O, if needed. */
       if ((retval = set_par_access(h5, var, xfer_plistid)))
         BAIL(retval);
@@ -1187,7 +1193,7 @@ nc4_get_vara(NC *nc, int ncid, int varid, const size_t *startp,
 #endif
     }
 #ifndef HDF5_CONVERT
-  if (need_to_convert)
+  if (need_to_convert && bufr != NULL)
     free(bufr);
 #endif
   if (xtend_size)
@@ -1553,9 +1559,13 @@ var_create_dataset(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var, nc_bool_t write_dimid
       int unlimdim = 0;
 
       /* Check to see if any unlimited dimensions are used in this var. */
-      for (d = 0; d < var->ndims; d++)
-        if (var->dim[d]->unlimited)
-          unlimdim++;
+      for (d = 0; d < var->ndims; d++) {
+	for (g = grp; g; g = g->parent)
+	  for (dim = g->dim; dim; dim = dim->l.next)
+	    if (dim->dimid == var->dimids[d])
+	      if (dim->unlimited)
+		unlimdim++;
+      }
 
       /* If there are no unlimited dims, and no filters, and the user
        * has not specified chunksizes, use contiguous variable for
@@ -1658,7 +1668,7 @@ var_create_dataset(NC_GRP_INFO_T *grp, NC_VAR_INFO_T *var, nc_bool_t write_dimid
 
   /* At long last, create the dataset. */
   name_to_use = var->hdf5_name ? var->hdf5_name : var->name;
-  LOG((4, "%s: about to H5Dcreate dataset %s of type 0x%x", __func__,
+  LOG((4, "%s: about to H5Dcreate2 dataset %s of type 0x%x", __func__,
        name_to_use, typeid));
   if ((var->hdf_datasetid = H5Dcreate2(grp->hdf_grpid, name_to_use, typeid,
                                        spaceid, H5P_DEFAULT, plistid, access_plistid)) < 0)
@@ -1733,7 +1743,7 @@ nc4_adjust_var_cache(NC_GRP_INFO_T *grp, NC_VAR_INFO_T * var)
   /* Nothing to be done. */
   if (var->contiguous)
     return NC_NOERR;
-#ifdef USE_PARALLEL
+#ifdef USE_PARALLEL4
   return NC_NOERR;
 #endif
 
@@ -2291,7 +2301,7 @@ write_var(NC_VAR_INFO_T *var, NC_GRP_INFO_T *grp, nc_bool_t write_dimid)
   /* Clear coord. var state transition flags */
   var->was_coord_var = NC_FALSE;
   var->became_coord_var = NC_FALSE;
-      
+
   /* Now check the attributes for this var. */
   if (var->attr_dirty)
     {
@@ -2360,7 +2370,7 @@ write_dim(NC_DIM_INFO_T *dim, NC_GRP_INFO_T *grp, nc_bool_t write_dimid)
         BAIL(NC_EHDFERR);
 
       /* Create the dataset that will be the dimension scale. */
-      LOG((4, "%s: about to H5Dcreate a dimscale dataset %s", __func__, dim->name));
+      LOG((4, "%s: about to H5Dcreate1 a dimscale dataset %s", __func__, dim->name));
       if ((dim->hdf_dimscaleid = H5Dcreate1(grp->hdf_grpid, dim->name, H5T_IEEE_F32BE,
                                             spaceid, create_propid)) < 0)
         BAIL(NC_EHDFERR);

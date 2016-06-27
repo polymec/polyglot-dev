@@ -282,7 +282,9 @@ px_pgin(ncio *const nciop,
 {
 	int status;
 	ssize_t nread;
-
+    size_t read_count = 0;
+    ssize_t bytes_xfered = 0;
+    void *p = vp;
 #ifdef X_ALIGN
 	assert(offset % X_ALIGN == 0);
 	assert(extent % X_ALIGN == 0);
@@ -309,16 +311,34 @@ px_pgin(ncio *const nciop,
 	}
 
 	errno = 0;
-	nread = read(nciop->fd, vp, extent);
-	if(nread != (ssize_t) extent)
-	{
-		status = errno;
-		if(nread == -1 || status != ENOERR)
-			return status;
-		/* else it's okay we read less than asked for */
-		(void) memset((char *)vp + nread, 0, (ssize_t)extent - nread);
-	}
-	*nreadp = nread;
+    /* Handle the case where the read is interrupted
+       by a signal (see NCF-337,
+       http://pubs.opengroup.org/onlinepubs/009695399/functions/read.html)
+
+       When this happens, nread will (should) be the bytes read, and
+       errno will be set to EINTR.  On older systems nread might be -1.
+       If this is the case, there's not a whole lot we can do about it
+       as we can't compute any offsets, so we will attempt to read again.
+       This *feels* like it could lead to an infinite loop, but it shouldn't
+       unless the read is being constantly interrupted by a signal, and is
+       on an older system which returns -1 instead of bytexs read.
+
+       The case where it's a short read is already handled by the function
+       (according to the comment below, at least). */
+    do {
+      nread = read(nciop->fd,vp,extent);
+    } while (nread == -1 && errno == EINTR);
+
+
+    if(nread != (ssize_t)extent) {
+      status = errno;
+      if( nread == -1 || (status != EINTR && status != ENOERR))
+        return status;
+      /* else it's okay we read less than asked for */
+      (void) memset((char *)vp + nread, 0, (ssize_t)extent - nread);
+    }
+
+    *nreadp = nread;
 	*posp += nread;
 
 	return ENOERR;
@@ -367,7 +387,7 @@ typedef struct ncio_px {
    offset - file offset for beginning of to region to be
    released.
 
-   rflags - only RGN_MODIFIED is relevent to this function, others ignored
+   rflags - only RGN_MODIFIED is relevant to this function, others ignored
 */
 static int
 px_rel(ncio_px *const pxp, off_t offset, int rflags)
@@ -400,7 +420,7 @@ px_rel(ncio_px *const pxp, off_t offset, int rflags)
    nciop - pointer to ncio struct.
    offset - num bytes from beginning of buffer to region to be
    released.
-   rflags - only RGN_MODIFIED is relevent to this function, others ignored
+   rflags - only RGN_MODIFIED is relevant to this function, others ignored
 */
 static int
 ncio_px_rel(ncio *const nciop, off_t offset, int rflags)
@@ -424,7 +444,7 @@ ncio_px_rel(ncio *const nciop, off_t offset, int rflags)
    offset - start byte of region to get.
    extent - how many bytes to read.
    rflags - One of the RGN_* flags defined in ncio.h.
-   vpp - pointer to pointer that will recieve data.
+   vpp - pointer to pointer that will receive data.
 
    NOTES:
 
@@ -667,7 +687,11 @@ done:
 	pxp->bf_rflags |= rflags;
 	pxp->bf_refcount++;
 
-	*vpp = (char *)pxp->bf_base + diff;
+#ifndef __CHAR_UNSIGNED__
+    *vpp = (void *)((char *)pxp->bf_base + diff);
+#else
+    *vpp = (void *)((signed char*)pxp->bf_base + diff);
+#endif
 	return ENOERR;
 }
 
@@ -1145,9 +1169,9 @@ ncio_spx_get(ncio *const nciop,
 	}
 
 	{
-		const size_t rndup = extent % X_ALIGN;
-		if(rndup != 0)
-			extent += X_ALIGN - rndup;
+      const size_t rndup = extent % X_ALIGN;
+      if(rndup != 0)
+        extent += X_ALIGN - rndup;
 	}
 
 	assert(offset % X_ALIGN == 0);
@@ -1163,7 +1187,7 @@ ncio_spx_get(ncio *const nciop,
 			pxp->bf_extent = 0;
 		}
 		assert(pxp->bf_extent == 0);
-		pxp->bf_base = malloc(extent);
+		pxp->bf_base = malloc(extent+1);
 		if(pxp->bf_base == NULL)
 			return ENOMEM;
 		pxp->bf_extent = extent;
@@ -1497,7 +1521,7 @@ ncio_px_new(const char *path, int ioflags)
 #define NC_DEFAULT_CREAT_MODE 0666
 #endif
 
-/* Create a file, and the ncio struct to go with it. This funtion is
+/* Create a file, and the ncio struct to go with it. This function is
    only called from nc__create_mp.
 
    path - path of file to create.
@@ -1516,6 +1540,7 @@ int
 posixio_create(const char *path, int ioflags,
 	size_t initialsz,
 	off_t igeto, size_t igetsz, size_t *sizehintp,
+	void* parameters,
 	ncio **nciopp, void **const igetvpp)
 {
 	ncio *nciop;
@@ -1659,6 +1684,7 @@ int
 posixio_open(const char *path,
 	int ioflags,
 	off_t igeto, size_t igetsz, size_t *sizehintp,
+        void* parameters,
 	ncio **nciopp, void **const igetvpp)
 {
 	ncio *nciop;
@@ -1674,7 +1700,7 @@ posixio_open(const char *path,
 		return ENOMEM;
 
 #ifdef O_BINARY
-	//#if _MSC_VER
+	/*#if _MSC_VER*/
 	fSet(oflags, O_BINARY);
 #endif
 

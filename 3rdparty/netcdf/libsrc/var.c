@@ -81,7 +81,6 @@ new_x_NC_var(
 #else /*!MALLOCHACK*/
 	  varp->dimids = (int*)malloc(o1);
 	  varp->shape = (size_t*)malloc(o2);
-      if(varp->shape) { memset(varp->shape,0,o2); }
 	  varp->dsizes = (off_t*)malloc(o3);
 #endif /*!MALLOCHACK*/
 	} else {
@@ -377,6 +376,7 @@ ncx_szof(nc_type type)
 	switch(type){
 	case NC_BYTE:
 	case NC_CHAR:
+	case NC_UBYTE:
 		return(1);
 	case NC_SHORT :
 		return(2);
@@ -386,6 +386,14 @@ ncx_szof(nc_type type)
 		return X_SIZEOF_FLOAT;
 	case NC_DOUBLE :
 		return X_SIZEOF_DOUBLE;
+	case NC_USHORT : 
+		return X_SIZEOF_USHORT;
+	case NC_UINT : 
+		return X_SIZEOF_UINT;
+	case NC_INT64 : 
+		return X_SIZEOF_INT64;
+	case NC_UINT64 : 
+		return X_SIZEOF_UINT64;
 	default:
 	        assert("ncx_szof invalid type" == 0);
 	        return 0;
@@ -461,6 +469,7 @@ out :
 		switch(varp->type) {
 		case NC_BYTE :
 		case NC_CHAR :
+		case NC_UBYTE :
 		case NC_SHORT :
 		        if( varp->len%4 != 0 )
 			{
@@ -509,32 +518,36 @@ NC_check_vlen(NC_var *varp, size_t vlen_max) {
 }
 
 
-/*
- * Given valid ncp and varid, return var
- *  else NULL on error
- * Formerly
-NC_hlookupvar()
+/*! Look up a variable by varid.
+ *
+ * Given a valid ncp structure and varid, return the var.
+ *
+ * Formerly NC_hlookupvar()
+ *
+ * @param[in] ncp NC3_INFO data structure.
+ * @param[in] varid The varid key for the var we are looking up.
+ * @param[out] varp Data structure to contain the varp pointer.
+ * @return Error code, if one exists, 0 otherwise.
  */
-NC_var *
-NC_lookupvar(NC3_INFO* ncp, int varid)
+
+int NC_lookupvar(NC3_INFO* ncp, int varid, NC_var **varp)
 {
-	NC_var *varp;
-
-	if(varid == NC_GLOBAL)
+  if(varid == NC_GLOBAL)
 	{
-		/* Global is error in this context */
-		return(NULL);
+      /* Global is error in this context */
+      return NC_EGLOBAL;
 	}
 
-	varp = elem_NC_vararray(&ncp->vars, (size_t)varid);
-	if(varp == NULL)
-	{
-		return NULL;
-	}
+  if(varp)
+    *varp = elem_NC_vararray(&ncp->vars, (size_t)varid);
+  else
+    return NC_ENOTVAR;
 
-	assert(varp != NULL);
+  if(*varp == NULL)
+    return NC_ENOTVAR;
 
-	return(varp);
+  return NC_NOERR;
+
 }
 
 
@@ -564,7 +577,7 @@ NC3_def_var( int ncid, const char *name, nc_type type,
 	if(status != NC_NOERR)
 		return status;
 
-	status = nc_cktype(type);
+	status = nc3_cktype(nc->mode, type);
 	if(status != NC_NOERR)
 		return status;
 
@@ -717,11 +730,11 @@ NC3_rename_var(int ncid, int varid, const char *unewname)
 		return NC_ENAMEINUSE;
 	}
 
-	varp = NC_lookupvar(ncp, varid);
-	if(varp == NULL)
+	status = NC_lookupvar(ncp, varid, &varp);
+	if(status != NC_NOERR)
 	{
 		/* invalid varid */
-		return NC_ENOTVAR; /* TODO: is this the right error code? */
+      return status;
 	}
 
 	old = varp->name;

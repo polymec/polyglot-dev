@@ -1,41 +1,39 @@
-/** \file
-Documentation of error handling.
+# NetCDF Programming Notes {#programming_notes}
 
-\page programming_notes Programming Notes
+[TOC]
 
-\tableofcontents
+<H2>See Also:</H2>
 
-\section ignored_if_null Ignored if NULL
+* \subpage nc-error-codes
+
+# Ignored if NULL {#ignored_if_null}
 
 Many of the argurments of netCDF functions are pointers. For example,
 the nc_inq() functions takes four pointers:
 
-\code
+~~~.C
 int nc_inq(int ncid, int *ndimsp, int *nvarsp, int *nattsp, int *unlimdimidp);
-\endcode
+~~~
 
-A NULL may be passed for any of these pointers, and it will be
-ignored. For example, interested in the number of dimensions only, the
-following code will work:
+A NULL may be passed for any of these pointers, and it will be ignored. For example, interested in the number of dimensions only, the following code will work:
 
-\code
+~~~.C
 int ndims;
 ...
 if (nc_inq(ncid, &ndims, NULL, NULL, NULL))
    return SOME_ERROR;
-\endcode
+~~~
 
-\section Allocating Storage for the Result
+# Allocating Storage for the Result {#allocating_storage_for_the_result}
 
-User must allocate space for the result of an inq function before the
-function is called.
+User must allocate space for the result of an inq function before the function is called.
 
-\section specify_hyperslab Specify a Hyperslab
+# Specify a Hyperslab {#specify_hyperslab}
 
 The NetCDF allows specification of hyperslabs to be read or written
 with vectors which specify the start, count, stride, and mapping.
 
-\subsection start_vector A Vector Specifying Start Index for Each Dimension
+## A Vector Specifying Start Index for Each Dimension {#start_vector}
 
 A vector of size_t integers specifying the index in the
 variable where the first of the data values will be read.
@@ -47,7 +45,7 @@ The length of start vector must be the same as the number of
 dimensions of the specified variable. The elements of start
 correspond, in order, to the variable's dimensions.
 
-\subsection count_vector A Vector Specifying Count for Each Dimension
+## A Vector Specifying Count for Each Dimension {#count_vector}
 
 A vector of size_t integers specifying the edge lengths
 along each dimension of the block of data values to be read.
@@ -61,7 +59,7 @@ variable's dimensions.
 Setting any element of the count array to zero causes the function to
 exit without error, and without doing anything.
 
-\subsection stride_vector A Vector Specifying Stride for Each Dimension
+## A Vector Specifying Stride for Each Dimension {#stride_vector}
 
 A vector of size_t integers specifying the interval between selected
 indices.
@@ -75,7 +73,7 @@ variable's dimensions.
 
 A NULL stride argument is treated as (1, 1, ... , 1).
 
-\subsection map_vector A Vector Specifying Mapping for Each Dimension
+## A Vector Specifying Mapping for Each Dimension {#map_vector}
 
 A vector of integers that specifies the mapping between the dimensions
 of a netCDF variable and the in-memory structure of the internal data
@@ -94,7 +92,7 @@ type-independent units of elements.
 memory locations is 1 and not the element's byte-length as in netCDF
 2.
 
-\section ncid NetCDF ID
+# NetCDF ID {#ncid}
 
 Most netCDF function require the netCDF ID as a first parameter.
 
@@ -109,5 +107,3 @@ that is returned by nc_open() and nc_create().)
 For netCDF-4/HDF5 files, netCDF IDs can come not just from nc_open()
 and nc_create(), but also from nc_def_grp(), nc_inq_grps(),
 nc_inq_ncid(), nc_inq_grp_parent(), and nc_inq_grp_full_ncid().
-
-*/
