@@ -17,12 +17,15 @@ if (NOT EXISTS ${NETCDF_LIBRARY})
   endif()
 
   message("Configuring netcdf library...")
+  # The amazing amount of crap required in this CMake command suggests that NetCDF/HDF5/CMake 
+  # coverage is not particularly well tested. :-/
   execute_process(COMMAND "${CMAKE_COMMAND}" -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} 
                   -DUSE_HDF5=ON -DHDF5_C_LIBRARY=${POLYMEC_HDF5_LIBRARY} -DHDF5_HL_LIBRARY=${POLYMEC_HDF5_HL_LIBRARY} 
+                  -DHDF5_C_LIBRARIES=${POLYMEC_HDF5_LIBRARY} -DHDF5_HL_LIBRARIES=${POLYMEC_HDF5_HL_LIBRARY} 
                   -DHDF5_INCLUDE_DIR=${POLYMEC_HDF5_INCLUDE_DIR} -DENABLE_PARALLEL=${POLYMEC_HAVE_MPI} -DHDF5_IS_PARALLEL_MPIO=${POLYMEC_HAVE_MPI} 
                   -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib -DENABLE_DAP=OFF -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS} 
-                  -DFIND_SHARED_LIBS=${BUILD_SHARED_LIBS} -DENABLE_DYNAMIC_LOADING=ON -DENABLE_TESTS=OFF -DBUILD_UTILITIES=OFF -DBUILD_EXAMPLES=OFF 
-                  -DNC_HAVE_PARALLEL_HDF5=${POLYMEC_HAVE_MPI} -DHDF5_IS_PARALLEL=${POLYMEC_HAVE_MPI}
+                  -DFIND_SHARED_LIBS=${BUILD_SHARED_LIBS} -DENABLE_DYNAMIC_LOADING=ON -DENABLE_TESTS=OFF -DBUILD_UTILITIES=ON -DBUILD_EXAMPLES=OFF 
+                  -DNC_HAVE_PARALLEL_HDF5=${POLYMEC_HAVE_MPI} -DHDF5_IS_PARALLEL=${POLYMEC_HAVE_MPI} 
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/netcdf
                   OUTPUT_VARIABLE netcdf_config_log ERROR_VARIABLE netcdf_config_err
                   RESULT_VARIABLE stat)
@@ -54,12 +57,12 @@ if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
   if (${NETCDF_LIBRARY} STREQUAL "${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX}")
     file(GLOB nc_libs "${PROJECT_BINARY_DIR}/lib/libnetcdf*${LIB_SUFFIX}*")
     install(FILES ${nc_libs} DESTINATION lib)
-#    foreach(nc_util nc-config;nccopy;ncdump;ncgen;ncgen3)
-#      list(APPEND nc_utils ${PROJECT_BINARY_DIR}/bin/${nc_util})
-#    endforeach()
-#    install(FILES ${nc_utils} DESTINATION bin
-#            PERMISSIONS OWNER_READ;OWNER_WRITE;OWNER_EXECUTE;
-#                        GROUP_READ;GROUP_EXECUTE;WORLD_READ;WORLD_EXECUTE)
+    foreach(nc_util nc-config;nccopy;ncdump;ncgen;ncgen3)
+      list(APPEND nc_utils ${PROJECT_BINARY_DIR}/bin/${nc_util})
+    endforeach()
+    install(FILES ${nc_utils} DESTINATION bin
+            PERMISSIONS OWNER_READ;OWNER_WRITE;OWNER_EXECUTE;
+                        GROUP_READ;GROUP_EXECUTE;WORLD_READ;WORLD_EXECUTE)
   endif()
 endif()
 set(POLYGLOT_TP_LIBS netcdf;${POLYGLOT_TP_LIBS})
@@ -83,7 +86,12 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX}")
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt ${exodus_CMakeLists})
  
   message("Configuring exodus library...")
-  execute_process(COMMAND env NETCDF_DIR=${POLYMEC_PREFIX} ${CMAKE_COMMAND} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED=${BUILD_SHARED_LIBS} -DHDF5_LIBRARY=${POLYMEC_HDF5_LIBRARY} -DHDF5HL_LIBRARY=${POLYMEC_HDF5_HL_LIBRARY}
+  execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} 
+                  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} 
+                  -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED=${BUILD_SHARED_LIBS} 
+                  -DNETCDF_LIBRARY=${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX} 
+                  -DNETCDF_INCLUDE_DIR=${PROJECT_BINARY_DIR}/include 
+                  -DHDF5_LIBRARY=${POLYMEC_HDF5_LIBRARY} -DHDF5HL_LIBRARY=${POLYMEC_HDF5_HL_LIBRARY}
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus
                   OUTPUT_VARIABLE exodus_config_log ERROR_VARIABLE exodus_config_err
                   RESULT_VARIABLE stat)
@@ -129,7 +137,7 @@ if (POLYMEC_HAVE_MPI)
                                         ${PROJECT_BINARY_DIR}/include
                   RESULT_VARIABLE stat)
   if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/cbind/include/exodusII_par.h DESTINATION lib)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/cbind/include/exodusII_par.h DESTINATION include)
   endif()
 
   # Build an exodus_par library.
