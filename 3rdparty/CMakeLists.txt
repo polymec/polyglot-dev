@@ -54,12 +54,12 @@ if (NOT CMAKE_INSTALL_PREFIX STREQUAL "INSTALL_DISABLED")
   if (${NETCDF_LIBRARY} STREQUAL "${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX}")
     file(GLOB nc_libs "${PROJECT_BINARY_DIR}/lib/libnetcdf*${LIB_SUFFIX}*")
     install(FILES ${nc_libs} DESTINATION lib)
-    foreach(nc_util nc-config;nccopy;ncdump;ncgen;ncgen3)
-      list(APPEND nc_utils ${PROJECT_BINARY_DIR}/bin/${nc_util})
-    endforeach()
-    install(FILES ${nc_utils} DESTINATION bin
-            PERMISSIONS OWNER_READ;OWNER_WRITE;OWNER_EXECUTE;
-                        GROUP_READ;GROUP_EXECUTE;WORLD_READ;WORLD_EXECUTE)
+#    foreach(nc_util nc-config;nccopy;ncdump;ncgen;ncgen3)
+#      list(APPEND nc_utils ${PROJECT_BINARY_DIR}/bin/${nc_util})
+#    endforeach()
+#    install(FILES ${nc_utils} DESTINATION bin
+#            PERMISSIONS OWNER_READ;OWNER_WRITE;OWNER_EXECUTE;
+#                        GROUP_READ;GROUP_EXECUTE;WORLD_READ;WORLD_EXECUTE)
   endif()
 endif()
 set(POLYGLOT_TP_LIBS netcdf;${POLYGLOT_TP_LIBS})
