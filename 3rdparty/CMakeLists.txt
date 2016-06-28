@@ -9,14 +9,14 @@ endif()
 # Build the netcdf library.
 set(NETCDF_LIBRARY "${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX}")
 if (NOT EXISTS ${NETCDF_LIBRARY})
-  message("Preparing netcdf...")
+  message(STATUS "Preparing netcdf...")
   execute_process(COMMAND cmake -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/netcdf ${CMAKE_CURRENT_BINARY_DIR}/netcdf
                   RESULT_VARIABLE stat)
   if (NOT stat EQUAL 0)
     message(FATAL_ERROR "Copying library source failed.")
   endif()
 
-  message("Configuring netcdf library...")
+  message(STATUS "Configuring netcdf library...")
   # The amazing amount of crap required in this CMake command suggests that NetCDF/HDF5/CMake 
   # coverage is not particularly well tested. :-/
   string(REPLACE "-pedantic-errors" "" NETCDF_C_FLAGS ${CMAKE_C_FLAGS})
@@ -37,7 +37,7 @@ if (NOT EXISTS ${NETCDF_LIBRARY})
     message(FATAL_ERROR "Error configuring netcdf library. See ${CMAKE_CURRENT_BINARY_DIR}/netcdf_config*.log for details.")
   endif()
 
-  message("Building and installing netcdf library...")
+  message(STATUS "Building and installing netcdf library...")
   execute_process(COMMAND make install -j4
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/netcdf
                   OUTPUT_VARIABLE netcdf_build_log ERROR_VARIABLE netcdf_build_err
@@ -71,14 +71,14 @@ set(POLYGLOT_TP_LIBS netcdf;${POLYGLOT_TP_LIBS})
 
 # Build the Exodus library.
 if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX}")
-  message("Preparing exodus...")
+  message(STATUS "Preparing exodus...")
   execute_process(COMMAND cmake -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/exodus ${CMAKE_CURRENT_BINARY_DIR}/exodus
                   RESULT_VARIABLE stat)
   if (NOT stat EQUAL 0)
     message(FATAL_ERROR "Copying library source failed.")
   endif()
 
-  message("Adjusting exodus CMakeLists.txt...")
+  message(STATUS "Adjusting exodus CMakeLists.txt...")
   file(READ ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt exodus_CMakeLists)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt.old ${exodus_CMakeLists})
   # Remove the Fortran bindings from the build.
@@ -87,7 +87,7 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX}")
   string(REPLACE "if (PYTHON)" "if (0)" exodus_CMakeLists ${exodus_CMakeLists})
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt ${exodus_CMakeLists})
  
-  message("Configuring exodus library...")
+  message(STATUS "Configuring exodus library...")
   string(REPLACE "-pedantic-errors" "" EXODUS_C_FLAGS ${CMAKE_C_FLAGS})
   execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_C_FLAGS=${EXODUS_C_FLAGS}
                   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} 
@@ -104,7 +104,7 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX}")
     message(FATAL_ERROR "Error configuring exodus library. See ${CMAKE_CURRENT_BINARY_DIR}/exodus_config*.log for details.")
   endif()
 
-  message("Building and installing exodus library...")
+  message(STATUS "Building and installing exodus library...")
   execute_process(COMMAND env NETCDF_DIR=${PROJECT_BINARY_DIR} make install -j4
                   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus
                   OUTPUT_VARIABLE exodus_build_log ERROR_VARIABLE exodus_build_err
