@@ -33,6 +33,7 @@ matrix:
     compiler: gcc
   - os: osx
     env: DEBUG=1 MPI=0 SHARED=1
+  - os: osx
     env: DEBUG=1 MPI=1 SHARED=1
 
 install: sh ./.travis/install-$TRAVIS_OS_NAME-deps.sh
