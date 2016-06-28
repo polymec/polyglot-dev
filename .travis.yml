@@ -52,5 +52,4 @@ after_success:
   - mv polyglot-$TRAVIS_OS_NAME-$CC-debug=$DEBUG-mpi=$MPI-shared=$SHARED.tar.gz latest
 
 after_failure: 
-  - cat build/*/polyglot/tests/CMakeFiles/test_cf_file.dir/link.txt
   - cat build/*/Testing/Temporary/LastTest.log
