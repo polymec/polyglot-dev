@@ -24,10 +24,16 @@ env:
 
 # Currently Apple doesn't use the real gcc, even if you tell it to.
 # So we exclude the gcc compiler option from Mac builds.
+# In addition, there's an open issue (#19) with NetCDF file writes in 
+# polymec configurations using debug=1 and shared=1, so we exclude that 
+# configuration on Macs.
 matrix:
   exclude:
   - os: osx
     compiler: gcc
+  - os: osx
+    env: DEBUG=1 MPI=0 SHARED=1
+    env: DEBUG=1 MPI=1 SHARED=1
 
 install: sh ./.travis/install-$TRAVIS_OS_NAME-deps.sh
 
