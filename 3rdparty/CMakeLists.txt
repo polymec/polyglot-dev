@@ -80,7 +80,7 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX}")
   file(READ ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt exodus_CMakeLists)
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt.old ${exodus_CMakeLists})
   # Remove the Fortran bindings from the build.
-  string(REPLACE "forbind" "" exodus_CMakeLists ${exodus_CMakeLists})
+  string(REPLACE "add_subdirectory(forbind)" "#add_subdirectory(forbind)" exodus_CMakeLists ${exodus_CMakeLists})
   # Remove the Python bindings stuff.
   string(REPLACE "if (PYTHON)" "if (0)" exodus_CMakeLists ${exodus_CMakeLists})
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt ${exodus_CMakeLists})

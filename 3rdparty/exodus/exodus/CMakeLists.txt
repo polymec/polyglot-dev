@@ -1,35 +1,31 @@
 cmake_minimum_required(VERSION 2.6)
 PROJECT(ExodusII C CXX Fortran)
 
-SET(EXODUSII_VERSION_MAJOR "5")
-SET(EXODUSII_VERSION_MINOR "14")
+SET(EXODUSII_VERSION_MAJOR "6")
+SET(EXODUSII_VERSION_MINOR "09")
 SET(EXODUSII_VERSION_PATCH "0")
 SET(EXODUSII_VERSION "${EXODUSII_VERSION_MAJOR}.${EXODUSII_VERSION_MINOR}")
 SET(EXODUSII_VERSION_FULL "${EXODUSII_VERSION}.${EXODUSII_VERSION_PATCH}")
 
-OPTION(BUILD_SHARED "Build the exodus libraries shared." OFF)
+add_subdirectory(cbind)
+add_subdirectory(forbind)
 
-IF(BUILD_SHARED)
-  SET(EXODUS_LIBRARY_TYPE SHARED)
-ELSE(BUILD_SHARED)
-  SET(EXODUS_LIBRARY_TYPE STATIC)
-ENDIF(BUILD_SHARED)
-
-SUBDIRS(cbind forbind)
-
-find_path( NETCDF_INCLUDE_DIR netcdf.h
-   $ENV{ACCESS}/inc
-   $ENV{NETCDF_DIR}/inc
-   $ENV{NETCDF_DIR}/include
-   $ENV{NETCDF_DIR}/libsrc
-)	
+find_path( NETCDF_INCLUDE_DIR NAMES netcdf.h 
+	   PATHS
+	   $ENV{NETCDF_DIR}/include
+	   $ENV{NETCDF_DIR}/libsrc
+	   $ENV{ACCESS}/include
+	   NO_DEFAULT_PATH
+	 )	
+find_path( NETCDF_INCLUDE_DIR NAMES netcdf.h)
 
 find_library( NETCDF_LIBRARY
-   NAMES netcdf
-   PATHS "$ENV{ACCESS}/lib"
-         "$ENV{NETCDF_DIR}/lib"
-	 "$ENV{NETCDF_DIR}/libsrc/.libs"
-)
+	      NAMES netcdf
+	      PATHS "$ENV{NETCDF_DIR}/lib"
+		    "$ENV{NETCDF_DIR}/libsrc/.libs"
+		    "$ENV{ACCESS}/lib"
+              NO_DEFAULT_PATH)
+find_library( NETCDF_LIBRARY NAMES netcdf)
 
 find_program (NETCDF_NCDUMP ncdump
    $ENV{ACCESS}/bin
@@ -38,20 +34,25 @@ find_program (NETCDF_NCDUMP ncdump
 )
 
 # Hack for HDF5
-find_library( HDF5_LIBRARY hdf5
+find_library( HDF5_LIBRARY NAMES hdf5
+  $ENV{HDF5_DIR}/lib
+  $ENV{HDF5_DIR}/libsrc/.libs
   $ENV{ACCESS}/lib/shared
   $ENV{ACCESS}/lib
-  $ENV{NETCDF_DIR}/lib
-  $ENV{NETCDF_DIR}/libsrc/.libs
   /usr/local/hdf5/lib
+  NO_DEFAULT_PATH
   )
-find_library( HDF5HL_LIBRARY hdf5_hl
+find_library( HDF5_LIBRARY NAMES hdf5)
+
+find_library( HDF5HL_LIBRARY NAMES hdf5_hl
+  $ENV{HDF5_DIR}/lib
+  $ENV{HDF5_DIR}/libsrc/.libs
   $ENV{ACCESS}/lib/shared
   $ENV{ACCESS}/lib
-  $ENV{NETCDF_DIR}/lib
-  $ENV{NETCDF_DIR}/libsrc/.libs
   /usr/local/hdf5/lib
+  NO_DEFAULT_PATH
   )
+find_library( HDF5HL_LIBRARY NAMES hdf5_hl)
 
 # Check for ZLib, but only if using HDF5.
 FIND_PACKAGE(ZLIB)
