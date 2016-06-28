@@ -19,7 +19,8 @@ if (NOT EXISTS ${NETCDF_LIBRARY})
   message("Configuring netcdf library...")
   # The amazing amount of crap required in this CMake command suggests that NetCDF/HDF5/CMake 
   # coverage is not particularly well tested. :-/
-  set(NETCDF_C_FLAGS "${CMAKE_C_FLAGS} -Wno-pointer-sign")
+  string(REPLACE "-pedantic-errors" "" NETCDF_C_FLAGS ${CMAKE_C_FLAGS})
+  string(REPLACE "-Werror-implicit-function-declaration" "" NETCDF_C_FLAGS ${NETCDF_C_FLAGS})
   execute_process(COMMAND "${CMAKE_COMMAND}" -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_C_FLAGS=${NETCDF_C_FLAGS}
                   -DUSE_HDF5=ON -DHDF5_C_LIBRARY=${POLYMEC_HDF5_LIBRARY} -DHDF5_HL_LIBRARY=${POLYMEC_HDF5_HL_LIBRARY} 
                   -DHDF5_C_LIBRARIES=${POLYMEC_HDF5_LIBRARY} -DHDF5_HL_LIBRARIES=${POLYMEC_HDF5_HL_LIBRARY} 
@@ -87,7 +88,8 @@ if (NOT EXISTS "${PROJECT_BINARY_DIR}/lib/libexodus${LIB_SUFFIX}")
   file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/exodus/exodus/CMakeLists.txt ${exodus_CMakeLists})
  
   message("Configuring exodus library...")
-  execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+  string(REPLACE "-pedantic-errors" "" EXODUS_C_FLAGS ${CMAKE_C_FLAGS})
+  execute_process(COMMAND ${CMAKE_COMMAND} -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_C_FLAGS=${EXODUS_C_FLAGS}
                   -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_INSTALL_PREFIX=${PROJECT_BINARY_DIR} 
                   -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED=${BUILD_SHARED_LIBS} 
                   -DNETCDF_LIBRARY=${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX} 
