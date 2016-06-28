@@ -7,7 +7,10 @@ add_mpi_polyglot_test(test_import_tetgen_mesh test_import_tetgen_mesh.c 1 2 4)
 # Exodus test data.
 set(exo_test_exes testwt-nfaced;testwt)
 foreach(exo_test_exe ${exo_test_exes})
-  add_polyglot_executable(${exo_test_exe} ${PROJECT_SOURCE_DIR}/3rdparty/exodus/exodus/cbind/test/${exo_test_exe}.c)
+  # Use these Exodus test programs to generate some Exodus data. We needed to 
+  # modify their source to force them to create NetCDF4/HDF5 data by changing the 
+  # file creation mode from NC_CLOBBER to NC_CLOBBER | NC_NETCDF4.
+  add_polyglot_executable(${exo_test_exe} ${CMAKE_CURRENT_SOURCE_DIR}/${exo_test_exe}.c)
   set(exo_test_script "${exo_test_script}${CMAKE_CURRENT_BINARY_DIR}/${exo_test_exe}\n")
 endforeach()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/generate_exodus_data.sh ${exo_test_script})

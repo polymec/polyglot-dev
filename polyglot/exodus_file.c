@@ -170,12 +170,23 @@ bool exodus_file_query(const char* filename,
       if (valid)
       {
         // Query the number of processes for which this file has data.
+        // Recently, we've had to add guards to check to see whether 
+        // DIM_NUM_PROCS exists in the file. If it doesn't, we assume that 
+        // the file corresponds to a serial data set.
         int num_proc_in_file;
         char file_type[2];
-        ex_get_init_info(id, num_mpi_processes, &num_proc_in_file, file_type);
-        if (is_parallel)
+        int dim_id, status = nc_inq_dimid(id, DIM_NUM_PROCS, &dim_id);
+        if (status == NC_NOERR)
         {
-          ASSERT(*num_mpi_processes == num_proc_in_file);
+          ex_get_init_info(id, num_mpi_processes, &num_proc_in_file, file_type);
+          if (is_parallel)
+          {
+            ASSERT(*num_mpi_processes == num_proc_in_file);
+          }
+        }
+        else
+        {
+          *num_mpi_processes = num_proc_in_file = 1;
         }
 
         if (times != NULL)
