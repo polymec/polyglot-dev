@@ -19,7 +19,7 @@ if (NOT EXISTS ${NETCDF_LIBRARY})
   message("Configuring netcdf library...")
   # The amazing amount of crap required in this CMake command suggests that NetCDF/HDF5/CMake 
   # coverage is not particularly well tested. :-/
-  set(NETCDF_C_FLAGS "${CMAKE_C_FLAGS} -Wno­pointer-sign")
+  set(NETCDF_C_FLAGS "${CMAKE_C_FLAGS} -Wno-pointer-sign")
   execute_process(COMMAND "${CMAKE_COMMAND}" -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_C_FLAGS=${NETCDF_C_FLAGS}
                   -DUSE_HDF5=ON -DHDF5_C_LIBRARY=${POLYMEC_HDF5_LIBRARY} -DHDF5_HL_LIBRARY=${POLYMEC_HDF5_HL_LIBRARY} 
                   -DHDF5_C_LIBRARIES=${POLYMEC_HDF5_LIBRARY} -DHDF5_HL_LIBRARIES=${POLYMEC_HDF5_HL_LIBRARY} 
