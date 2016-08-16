@@ -13,7 +13,7 @@
 #include "core/silo_file.h"
 #include "polyglot/import_tetgen_mesh.h"
 
-void test_import_tetgen_mesh(void** state)
+static void test_import_tetgen_mesh(void** state)
 {
   // Create a TetGen mesh from the tetgen_example.* files.
   mesh_t* mesh = import_tetgen_mesh(MPI_COMM_WORLD, 
@@ -50,7 +50,7 @@ void test_import_tetgen_mesh(void** state)
   mesh_free(mesh);
 }
 
-void test_plot_tetgen_mesh(void** state)
+static void test_plot_tetgen_mesh(void** state)
 {
   // Create a TetGen mesh from the tetgen_example.* files.
   mesh_t* mesh = import_tetgen_mesh(MPI_COMM_WORLD, 

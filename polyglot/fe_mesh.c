@@ -491,19 +491,20 @@ point_t* fe_mesh_node_positions(fe_mesh_t* mesh)
 int fe_mesh_num_element_sets(fe_mesh_t* mesh)
 {
   // Count up the tags in the appropriate tagger.
-  int pos = 0, *tag, size, num_tags = 0;
+  int pos = 0, *tag, num_tags = 0;
+  size_t size;
   char* tag_name;
   while (tagger_next_tag(mesh->elem_sets, &pos, &tag_name, &tag, &size))
     ++num_tags;
   return num_tags;
 }
 
-int* fe_mesh_create_element_set(fe_mesh_t* mesh, const char* name, int size)
+int* fe_mesh_create_element_set(fe_mesh_t* mesh, const char* name, size_t size)
 {
   return tagger_create_tag(mesh->elem_sets, name, size);
 }
 
-bool fe_mesh_next_element_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+bool fe_mesh_next_element_set(fe_mesh_t* mesh, int* pos, char** name, int** set, size_t* size)
 {
   return tagger_next_tag(mesh->elem_sets, pos, name, set, size);
 }
@@ -511,19 +512,20 @@ bool fe_mesh_next_element_set(fe_mesh_t* mesh, int* pos, char** name, int** set,
 int fe_mesh_num_face_sets(fe_mesh_t* mesh)
 {
   // Count up the tags in the appropriate tagger.
-  int pos = 0, *tag, size, num_tags = 0;
+  int pos = 0, *tag, num_tags = 0;
+  size_t size;
   char* tag_name;
   while (tagger_next_tag(mesh->face_sets, &pos, &tag_name, &tag, &size))
     ++num_tags;
   return num_tags;
 }
 
-int* fe_mesh_create_face_set(fe_mesh_t* mesh, const char* name, int size)
+int* fe_mesh_create_face_set(fe_mesh_t* mesh, const char* name, size_t size)
 {
   return tagger_create_tag(mesh->face_sets, name, size);
 }
 
-bool fe_mesh_next_face_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+bool fe_mesh_next_face_set(fe_mesh_t* mesh, int* pos, char** name, int** set, size_t* size)
 {
   return tagger_next_tag(mesh->face_sets, pos, name, set, size);
 }
@@ -531,19 +533,20 @@ bool fe_mesh_next_face_set(fe_mesh_t* mesh, int* pos, char** name, int** set, in
 int fe_mesh_num_edge_sets(fe_mesh_t* mesh)
 {
   // Count up the tags in the appropriate tagger.
-  int pos = 0, *tag, size, num_tags = 0;
+  int pos = 0, *tag, num_tags = 0;
+  size_t size;
   char* tag_name;
   while (tagger_next_tag(mesh->edge_sets, &pos, &tag_name, &tag, &size))
     ++num_tags;
   return num_tags;
 }
 
-int* fe_mesh_create_edge_set(fe_mesh_t* mesh, const char* name, int size)
+int* fe_mesh_create_edge_set(fe_mesh_t* mesh, const char* name, size_t size)
 {
   return tagger_create_tag(mesh->edge_sets, name, size);
 }
 
-bool fe_mesh_next_edge_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+bool fe_mesh_next_edge_set(fe_mesh_t* mesh, int* pos, char** name, int** set, size_t* size)
 {
   return tagger_next_tag(mesh->edge_sets, pos, name, set, size);
 }
@@ -551,19 +554,20 @@ bool fe_mesh_next_edge_set(fe_mesh_t* mesh, int* pos, char** name, int** set, in
 int fe_mesh_num_node_sets(fe_mesh_t* mesh)
 {
   // Count up the tags in the appropriate tagger.
-  int pos = 0, *tag, size, num_tags = 0;
+  int pos = 0, *tag, num_tags = 0;
+  size_t size;
   char* tag_name;
   while (tagger_next_tag(mesh->node_sets, &pos, &tag_name, &tag, &size))
     ++num_tags;
   return num_tags;
 }
 
-int* fe_mesh_create_node_set(fe_mesh_t* mesh, const char* name, int size)
+int* fe_mesh_create_node_set(fe_mesh_t* mesh, const char* name, size_t size)
 {
   return tagger_create_tag(mesh->node_sets, name, size);
 }
 
-bool fe_mesh_next_node_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+bool fe_mesh_next_node_set(fe_mesh_t* mesh, int* pos, char** name, int** set, size_t* size)
 {
   return tagger_next_tag(mesh->node_sets, pos, name, set, size);
 }
@@ -571,19 +575,20 @@ bool fe_mesh_next_node_set(fe_mesh_t* mesh, int* pos, char** name, int** set, in
 int fe_mesh_num_side_sets(fe_mesh_t* mesh)
 {
   // Count up the tags in the appropriate tagger.
-  int pos = 0, *tag, size, num_tags = 0;
+  int pos = 0, *tag, num_tags = 0;
+  size_t size;
   char* tag_name;
   while (tagger_next_tag(mesh->side_sets, &pos, &tag_name, &tag, &size))
     ++num_tags;
   return num_tags;
 }
 
-int* fe_mesh_create_side_set(fe_mesh_t* mesh, const char* name, int size)
+int* fe_mesh_create_side_set(fe_mesh_t* mesh, const char* name, size_t size)
 {
   return tagger_create_tag(mesh->side_sets, name, 2*size);
 }
 
-bool fe_mesh_next_side_set(fe_mesh_t* mesh, int* pos, char** name, int** set, int* size)
+bool fe_mesh_next_side_set(fe_mesh_t* mesh, int* pos, char** name, int** set, size_t* size)
 {
   return tagger_next_tag(mesh->side_sets, pos, name, set, size);
 }
@@ -608,6 +613,7 @@ static int get_num_cell_faces(fe_mesh_element_t elem_type)
   }
 }
 
+#if 0
 // Returns true if t1 and t2 are the same size and contain the same numbers 
 // (regardless of order). Specific to 3- and 4-tuples.
 static bool tuples_are_equivalent(int* t1, int* t2)
@@ -633,6 +639,7 @@ static bool tuples_are_equivalent(int* t1, int* t2)
   else
     return false;
 }
+#endif
 
 static int map_nodes_to_face(int_tuple_int_unordered_map_t* node_face_map,
                              int* nodes,
@@ -917,7 +924,8 @@ mesh_t* mesh_from_fe_mesh(fe_mesh_t* fe_mesh)
   mesh_compute_geometry(mesh);
 
   // Sets -> tags.
-  int pos = 0, *set, set_size;
+  int pos = 0, *set;
+  size_t set_size;
   char* set_name;
   while (fe_mesh_next_element_set(fe_mesh, &pos, &set_name, &set, &set_size))
   {
@@ -970,7 +978,7 @@ fe_mesh_t* fe_mesh_from_mesh(mesh_t* fv_mesh,
     for (int b = 0; b < element_block_tags->size; ++b)
     {
       char* tag_name = element_block_tags->data[b];
-      int num_elem;
+      size_t num_elem;
       int* block_tag = mesh_tag(fv_mesh->cell_tags, tag_name, &num_elem);
       int* num_elem_faces = polymec_malloc(sizeof(int) * num_elem);
       int elem_faces_size = 0;

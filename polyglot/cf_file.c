@@ -96,7 +96,7 @@ static int var_identifier(int file_id, const char* var_name)
     return id;
 }
 
-void find_vertical_coordinate(int file_id, int* lev_id, int* lev_dim, char* lev_name)
+static void find_vertical_coordinate(int file_id, int* lev_id, int* lev_dim, char* lev_name)
 {
   // This name should identify a dimension AND a variable, and the variable should 
   // have a "units" attribute, and a "positive" attribute (OR have a valid 
@@ -311,7 +311,7 @@ cf_file_t* cf_file_open(const char* filename)
 
     // Get all of the lat/lon variables we can find.
     int nvarsp;
-    int err = nc_inq(file_id, NULL, &nvarsp, NULL, NULL);
+    err = nc_inq(file_id, NULL, &nvarsp, NULL, NULL);
     if (err != NC_NOERR)
       polymec_error("cf_file_open: Error retrieving number of vars: ", nc_strerror(err));
     for (int var_id = 0; var_id < nvarsp; ++var_id)

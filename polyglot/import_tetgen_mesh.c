@@ -321,7 +321,7 @@ static bool face_points_outward(tet_face_t* face,
   point_displacement(n1, n2, &x12);
   point_displacement(n1, n3, &x13);
   vector_cross(&x12, &x13, &nf);
-  ASSERT(vector_mag(&nf) != 0.0);
+  ASSERT(vector_mag(&nf) > 0.0);
 
   // Get the remaining tetrahedron node.
   point_t* n4 = ((tet->nodes[0] != face->nodes[0]) &&
@@ -403,7 +403,7 @@ mesh_t* import_tetgen_mesh(MPI_Comm comm,
     }
     {
       // Use a triple for querying faces.
-      int* nodes = int_tuple_new(3);
+      int* nodes3 = int_tuple_new(3);
 
       // Loop over cells and find the faces connecting them to their neighbors.
       for (int c = 0; c < mesh->num_cells; ++c)
@@ -423,15 +423,15 @@ mesh_t* import_tetgen_mesh(MPI_Comm comm,
         for (int n = 0; n < 4; ++n)
         {
           // Nodes of cell c on this face.
-          nodes[0] = t->nodes[tet_face_nodes[n][0]];
-          nodes[1] = t->nodes[tet_face_nodes[n][1]];
-          nodes[2] = t->nodes[tet_face_nodes[n][2]];
-          int_qsort(nodes, 3);
+          nodes3[0] = t->nodes[tet_face_nodes[n][0]];
+          nodes3[1] = t->nodes[tet_face_nodes[n][1]];
+          nodes3[2] = t->nodes[tet_face_nodes[n][2]];
+          int_qsort(nodes3, 3);
 
           // Find the face with these nodes.
-          int* face_p = int_tuple_int_unordered_map_get(face_for_nodes, nodes);
+          int* face_p = int_tuple_int_unordered_map_get(face_for_nodes, nodes3);
           if (face_p == NULL)
-            polymec_error("TetGen files are inconsistent (cell %d does not have a face with nodes %d, %d, %d)", c+1, nodes[0]+1, nodes[1]+1, nodes[2]+1);
+            polymec_error("TetGen files are inconsistent (cell %d does not have a face with nodes %d, %d, %d)", c+1, nodes3[0]+1, nodes3[1]+1, nodes3[2]+1);
           int face = *face_p;
 
           // Determine whether the face has an outward or inward normal w.r.t. 
@@ -468,7 +468,7 @@ mesh_t* import_tetgen_mesh(MPI_Comm comm,
       }
 
       // Clean up.
-      int_tuple_free(nodes);
+      int_tuple_free(nodes3);
     }
 
     // Build edges.

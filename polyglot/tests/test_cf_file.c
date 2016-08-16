@@ -12,7 +12,7 @@
 #include "cmocka.h"
 #include "polyglot/cf_file.h"
 
-void test_cf_file_open(void** state)
+static void test_cf_file_open(void** state)
 {
   cf_file_t* cf = cf_file_open(CMAKE_CURRENT_SOURCE_DIR "/cf_test_data.nc");
   int major, minor, patch;
@@ -29,7 +29,7 @@ void test_cf_file_open(void** state)
   cf_file_close(cf);
 }
 
-void test_cf_file_write(void** state)
+static void test_cf_file_write(void** state)
 {
   cf_file_t* cf = cf_file_new("cf_test_write.nc");
   int major, minor, patch;

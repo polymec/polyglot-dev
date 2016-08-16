@@ -175,8 +175,8 @@ bool exodus_file_query(const char* filename,
         // the file corresponds to a serial data set.
         int num_proc_in_file;
         char file_type[2];
-        int dim_id, status = nc_inq_dimid(id, DIM_NUM_PROCS, &dim_id);
-        if (status == NC_NOERR)
+        int dim_id, status1 = nc_inq_dimid(id, DIM_NUM_PROCS, &dim_id);
+        if (status1 == NC_NOERR)
         {
           ex_get_init_info(id, num_mpi_processes, &num_proc_in_file, file_type);
           if (is_parallel)
@@ -442,7 +442,7 @@ static void write_set(exodus_file_t* file,
                       int set_id,
                       char* set_name,
                       int* set,
-                      int set_size)
+                      size_t set_size)
 {
   int num_dist_factors = 0;
   if (set_type != EX_SIDE_SET)
@@ -542,10 +542,10 @@ void exodus_file_write_mesh(exodus_file_t* file,
   if (is_polyhedral)
   {
     // Generate face->node connectivity information.
-    int num_faces = fe_mesh_num_faces(mesh);
+    int num_pfaces = fe_mesh_num_faces(mesh);
     int face_node_size = 0;
-    int num_face_nodes[num_faces];
-    for (int f = 0; f < num_faces; ++f)
+    int num_face_nodes[num_pfaces];
+    for (int f = 0; f < num_pfaces; ++f)
     {
       int num_nodes = fe_mesh_num_face_nodes(mesh, f);
       num_face_nodes[f] = num_nodes;
@@ -553,7 +553,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
     }
     int* face_nodes = polymec_malloc(sizeof(int) * face_node_size);
     int offset = 0;
-    for (int f = 0; f < num_faces; ++f)
+    for (int f = 0; f < num_pfaces; ++f)
     {
       fe_mesh_get_face_nodes(mesh, f, &face_nodes[offset]);
       offset += num_face_nodes[f];
@@ -563,7 +563,7 @@ void exodus_file_write_mesh(exodus_file_t* file,
 
     // Write an "nsided" face block.
     ex_put_block(file->ex_id, EX_FACE_BLOCK, 1, "nsided",
-                 num_faces, face_node_size, 0, 0, 0);
+                 num_pfaces, face_node_size, 0, 0, 0);
     ex_put_name(file->ex_id, EX_FACE_BLOCK, 1, "face_block");
     ex_put_conn(file->ex_id, EX_FACE_BLOCK, 1, face_nodes, NULL, NULL);
 
@@ -580,24 +580,24 @@ void exodus_file_write_mesh(exodus_file_t* file,
   while (fe_mesh_next_block(mesh, &pos, &block_name, &block))
   {
     int elem_block = pos;
-    int num_elem = fe_block_num_elements(block);
+    int num_e = fe_block_num_elements(block);
     fe_mesh_element_t elem_type = fe_block_element_type(block);
     if (elem_type == FE_POLYHEDRON)
     {
       // Count up the faces in the block and write the block information.
       int tot_num_elem_faces = 0;
-      int faces_per_elem[num_elem];
-      for (int i = 0; i < num_elem; ++i)
+      int faces_per_elem[num_e];
+      for (int i = 0; i < num_e; ++i)
       {
         faces_per_elem[i] = fe_block_num_element_faces(block, i);
         tot_num_elem_faces += faces_per_elem[i];
       }
       ex_put_block(file->ex_id, EX_ELEM_BLOCK, elem_block, "nfaced", 
-                   num_elem, 0, 0, tot_num_elem_faces, 0);
+                   num_e, 0, 0, tot_num_elem_faces, 0);
 
       // Write elem->face connectivity information.
       int elem_faces[tot_num_elem_faces], offset = 0;
-      for (int i = 0; i < num_elem; ++i)
+      for (int i = 0; i < num_e; ++i)
       {
         fe_block_get_element_faces(block, i, &elem_faces[offset]);
         offset += faces_per_elem[i];
@@ -616,16 +616,16 @@ void exodus_file_write_mesh(exodus_file_t* file,
 
       // Write the block.
       ex_put_block(file->ex_id, EX_ELEM_BLOCK, elem_block, elem_type_name, 
-                   num_elem, num_nodes_per_elem, 0, 0, 0);
+                   num_e, num_nodes_per_elem, 0, 0, 0);
 
       // Write the elem->node connectivity.
-      int elem_nodes[num_elem * num_nodes_per_elem], offset = 0;
-      for (int i = 0; i < num_elem; ++i)
+      int elem_nodes[num_e* num_nodes_per_elem], offset = 0;
+      for (int i = 0; i < num_e; ++i)
       {
         fe_block_get_element_nodes(block, i, &elem_nodes[offset]);
         offset += num_nodes_per_elem;
       }
-      for (int i = 0; i < num_elem * num_nodes_per_elem; ++i)
+      for (int i = 0; i < num_e* num_nodes_per_elem; ++i)
         elem_nodes[i] += 1;
       ex_put_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, elem_nodes, NULL, NULL);
     }
@@ -648,7 +648,8 @@ void exodus_file_write_mesh(exodus_file_t* file,
   ex_put_coord_names(file->ex_id, coord_names);
 
   // Write sets of entities.
-  int *set, set_size, set_id = 0;
+  int *set, set_id = 0;
+  size_t set_size;
   char* set_name;
   pos = set_id = 0;
   while (fe_mesh_next_element_set(mesh, &pos, &set_name, &set, &set_size))
@@ -671,11 +672,12 @@ static void fetch_set(exodus_file_t* file,
                       ex_entity_type set_type,
                       int set_id,
                       fe_mesh_t* mesh,
-                      int* (*create_set)(fe_mesh_t* mesh, const char* name, int))
+                      int* (*create_set)(fe_mesh_t* mesh, const char* name, size_t))
 {
   char set_name[MAX_NAME_LENGTH+1];
   ex_get_name(file->ex_id, set_type, (ex_entity_id)set_id, set_name);
-  int set_size, num_dist_factors;
+  size_t set_size;
+  int num_dist_factors;
   ex_get_set_param(file->ex_id, set_type, (ex_entity_id)set_id, &set_size, &num_dist_factors);
   int* set = create_set(mesh, set_name, set_size);
   ex_get_set(file->ex_id, set_type, (ex_entity_id)set_id, set, NULL);
@@ -762,14 +764,14 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
 
       // Get the element->face connectivity.
       int elem_face_size = 0;
-      for (int i = 0; i < num_elem; ++i)
-        elem_face_size += num_elem_faces[i];
+      for (int j = 0; j < num_elem; ++j)
+        elem_face_size += num_elem_faces[j];
       int* elem_faces = polymec_malloc(sizeof(int) * elem_face_size);
       ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, NULL, NULL, elem_faces);
 
       // Subtract 1 from each element face.
-      for (int i = 0; i < elem_face_size; ++i)
-        elem_faces[i] -= 1;
+      for (int j = 0; j < elem_face_size; ++j)
+        elem_faces[j] -= 1;
 
       // Create the element block.
       block = polyhedral_fe_block_new(num_elem, num_elem_faces, elem_faces);
@@ -781,8 +783,8 @@ fe_mesh_t* exodus_file_read_mesh(exodus_file_t* file)
       ex_get_conn(file->ex_id, EX_ELEM_BLOCK, elem_block, node_conn, NULL, NULL);
       
       // Subtract 1 from each element node.
-      for (int i = 0; i < num_elem * num_nodes_per_elem; ++i)
-        node_conn[i] -= 1;
+      for (int j = 0; j < num_elem * num_nodes_per_elem; ++j)
+        node_conn[j] -= 1;
 
       // Build the element block.
       block = fe_block_new(num_elem, elem_type, num_nodes_per_elem, node_conn);

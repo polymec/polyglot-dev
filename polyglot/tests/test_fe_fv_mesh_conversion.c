@@ -13,7 +13,7 @@
 #include "geometry/create_uniform_mesh.h"
 #include "polyglot/exodus_file.h"
 
-void test_mesh_from_fe_mesh(void** state)
+static void test_mesh_from_fe_mesh(void** state)
 {
   exodus_file_t* file = exodus_file_open(MPI_COMM_WORLD, "test-3d.exo");
   fe_mesh_t* fe_mesh = exodus_file_read_mesh(file);
@@ -28,7 +28,7 @@ void test_mesh_from_fe_mesh(void** state)
   mesh_free(fv_mesh);
 }
 
-void test_fe_mesh_from_mesh(void** state)
+static void test_fe_mesh_from_mesh(void** state)
 {
   bbox_t bbox = {.x1 = 0.0, .x2 = 1.0,
                  .y1 = 0.0, .y2 = 1.0,

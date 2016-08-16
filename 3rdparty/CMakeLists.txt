@@ -6,6 +6,10 @@ else()
   set(LIB_SUFFIX .a)
 endif()
 
+# We don't hold third-party library code to the same standard of excellence  
+# to which we adhere. :-)
+string(REPLACE "-Werror " " " CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+
 # Build the netcdf library.
 set(NETCDF_LIBRARY "${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX}")
 if (NOT EXISTS ${NETCDF_LIBRARY})

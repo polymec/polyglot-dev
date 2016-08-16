@@ -38,6 +38,8 @@
 *
 *****************************************************************************/
 
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wfloat-conversion"
 
 #include <stdlib.h>
 #include <string.h>

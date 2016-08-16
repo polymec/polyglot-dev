@@ -20,6 +20,7 @@
 // write_gnuplot_points(args) -- This function writes a given list of points
 // to a file on disk.
 //
+int write_gnuplot_points(lua_State* lua);
 int write_gnuplot_points(lua_State* lua)
 {
   // Rank 0 only.

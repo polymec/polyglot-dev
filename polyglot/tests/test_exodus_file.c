@@ -12,7 +12,7 @@
 #include "cmocka.h"
 #include "polyglot/exodus_file.h"
 
-void test_exodus_file_query(void** state)
+static void test_exodus_file_query(void** state)
 {
   size_t real_size;
   float version;
@@ -31,7 +31,7 @@ void test_exodus_file_query(void** state)
   real_array_free(times);
 }
 
-void test_write_exodus_file(void** state)
+static void test_write_exodus_file(void** state)
 {
   fe_mesh_t* mesh = fe_mesh_new(MPI_COMM_WORLD, 22);
   int elem1_node_indices[] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -93,7 +93,7 @@ void test_write_exodus_file(void** state)
   fe_mesh_free(mesh);
 }
 
-void test_read_exodus_file(void** state)
+static void test_read_exodus_file(void** state)
 {
   exodus_file_t* file = exodus_file_open(MPI_COMM_WORLD, "test-3d.exo");
   assert_true(file != NULL);
@@ -161,7 +161,8 @@ void test_read_exodus_file(void** state)
   assert_true(fe_block_element_type(block) == FE_TETRAHEDRON);
 
   // Node sets.
-  int* set, set_size;
+  int* set;
+  size_t set_size;
   char* set_name;
   pos = 0;
   int num_node_sets = 0;
@@ -193,7 +194,7 @@ void test_read_exodus_file(void** state)
   exodus_file_close(file);
 }
 
-void test_read_poly_exodus_file(void** state)
+static void test_read_poly_exodus_file(void** state)
 {
   exodus_file_t* file = exodus_file_open(MPI_COMM_WORLD, "test-nfaced.exo");
   assert_true(file != NULL);
@@ -247,7 +248,7 @@ void test_read_poly_exodus_file(void** state)
   exodus_file_close(file);
 }
 
-void test_write_poly_exodus_file(void** state)
+static void test_write_poly_exodus_file(void** state)
 {
   fe_mesh_t* mesh = fe_mesh_new(MPI_COMM_WORLD, 14);
   int num_elem_faces[3] = {5, 5, 7};

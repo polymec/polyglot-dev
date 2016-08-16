@@ -10,6 +10,9 @@
 
 #include "core/polymec_version.h"
 #include "polyglot/polyglot.h"
+
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-variable"
 #include "polyglot/polyglot_version.h"
 
 #if POLYGLOT_MAJOR_VERSION > 0

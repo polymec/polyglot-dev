@@ -153,6 +153,9 @@ bool cf_file_has_time_series(cf_file_t* file);
 // no time series.
 int cf_file_num_times(cf_file_t* file);
 
+// Retrieves the times from the file's time series.
+void cf_file_get_times(cf_file_t* file, real_t* times);
+
 // Retrieves time information (units and calendar) to strings large enough to 
 // hold NC_NAME_MAX+1 characters.
 void cf_file_get_time_metadata(cf_file_t* file,
