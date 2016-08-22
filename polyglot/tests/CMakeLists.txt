@@ -11,6 +11,14 @@ foreach(exo_test_exe ${exo_test_exes})
   # modify their source to force them to create NetCDF4/HDF5 data by changing the 
   # file creation mode from NC_CLOBBER to NC_CLOBBER | NC_NETCDF4.
   add_polyglot_executable(${exo_test_exe} ${CMAKE_CURRENT_SOURCE_DIR}/${exo_test_exe}.c)
+
+  # Make sure warnings aren't counted as errors in these test programs, 
+  # since we don't maintain them directly.
+  string(REPLACE "-Werror " " " TEST_EXE_C_FLAGS ${CMAKE_C_FLAGS})
+  set_target_properties(${exo_test_exe} PROPERTIES COMPILE_FLAGS 
+                        "${TEST_EXE_C_FLAGS}")
+
+  # Here's the test script.
   set(exo_test_script "${exo_test_script}${CMAKE_CURRENT_BINARY_DIR}/${exo_test_exe}\n")
 endforeach()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/generate_exodus_data.sh ${exo_test_script})

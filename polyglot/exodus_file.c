@@ -20,6 +20,10 @@
 #error "The NetCDF library used does not support NetCDF4."
 #endif
 
+// This warning couples Doxygen \deprecated tags to code in Exodus, 
+// which we need to disable to continue our work.
+#pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
+
 #include "exodusII.h"
 #include "exodusII_int.h"
 
@@ -152,7 +156,7 @@ bool exodus_file_query(const char* filename,
     {
       // Make sure that each of the element blocks in this file have 
       // valid 3D element types.
-      int num_elem_blocks = mesh_info.num_elem_blk;
+      int num_elem_blocks = (int)mesh_info.num_elem_blk;
       int elem_block_ids[num_elem_blocks];
       ex_get_ids(id, EX_ELEM_BLOCK, elem_block_ids);
       for (int i = 0; i < num_elem_blocks; ++i)
@@ -197,7 +201,7 @@ bool exodus_file_query(const char* filename,
         if (times != NULL)
         {
           // Ask for the times within the file.
-          int num_times = ex_inquire_int(id, EX_INQ_TIME);
+          int num_times = (int)ex_inquire_int(id, EX_INQ_TIME);
           real_array_resize(times, num_times);
           if (num_times > 0)
           {
@@ -333,27 +337,27 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
       if ((status >= 0) && (mesh_info.num_dim == 3))
       {
         strncpy(file->title, mesh_info.title, MAX_NAME_LENGTH);
-        file->num_nodes = mesh_info.num_nodes;
-        file->num_elem = mesh_info.num_elem;
-        file->num_faces = mesh_info.num_face;
-        file->num_edges = mesh_info.num_edge;
-        file->num_elem_blocks = mesh_info.num_elem_blk;
+        file->num_nodes = (int)mesh_info.num_nodes;
+        file->num_elem = (int)mesh_info.num_elem;
+        file->num_faces = (int)mesh_info.num_face;
+        file->num_edges = (int)mesh_info.num_edge;
+        file->num_elem_blocks = (int)mesh_info.num_elem_blk;
         file->elem_block_ids = polymec_malloc(sizeof(int) * file->num_elem_blocks);
         if (file->num_elem_blocks > 0)
           ex_get_ids(file->ex_id, EX_ELEM_BLOCK, file->elem_block_ids);
-        file->num_face_blocks = mesh_info.num_face_blk;
+        file->num_face_blocks = (int)mesh_info.num_face_blk;
         file->face_block_ids = polymec_malloc(sizeof(int) * file->num_face_blocks);
         if (file->num_face_blocks > 0)
           ex_get_ids(file->ex_id, EX_FACE_BLOCK, file->face_block_ids);
-        file->num_edge_blocks = mesh_info.num_edge_blk;
+        file->num_edge_blocks = (int)mesh_info.num_edge_blk;
         file->edge_block_ids = polymec_malloc(sizeof(int) * file->num_edge_blocks);
         if (file->num_edge_blocks > 0)
           ex_get_ids(file->ex_id, EX_EDGE_BLOCK, file->edge_block_ids);
-        file->num_elem_sets = mesh_info.num_elem_sets;
-        file->num_face_sets = mesh_info.num_face_sets;
-        file->num_edge_sets = mesh_info.num_edge_sets;
-        file->num_node_sets = mesh_info.num_node_sets;
-        file->num_side_sets = mesh_info.num_side_sets;
+        file->num_elem_sets = (int)mesh_info.num_elem_sets;
+        file->num_face_sets = (int)mesh_info.num_face_sets;
+        file->num_edge_sets = (int)mesh_info.num_edge_sets;
+        file->num_node_sets = (int)mesh_info.num_node_sets;
+        file->num_side_sets = (int)mesh_info.num_side_sets;
       }
     }
     else
