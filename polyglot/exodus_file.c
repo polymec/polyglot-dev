@@ -15,6 +15,11 @@
 #endif 
 
 #include "netcdf.h"
+#include "netcdf_meta.h"
+#if !defined NC_HAS_NC4 || !NC_HAS_NC4
+#error "The NetCDF library used does not support NetCDF4."
+#endif
+
 #include "exodusII.h"
 #include "exodusII_int.h"
 
@@ -219,7 +224,8 @@ static void fetch_variable_names(int ex_id, ex_entity_type obj_type, string_arra
   ex_get_variable_param(ex_id, obj_type, &num_vars);
   for (int i = 0; i < num_vars; ++i)
     string_array_append_with_dtor(var_names, (char*)polymec_malloc(sizeof(char) * (MAX_NAME_LENGTH+1)), string_free);
-  ex_get_variable_names(ex_id, obj_type, num_vars, var_names->data);
+  if (num_vars > 0)
+    ex_get_variable_names(ex_id, obj_type, num_vars, var_names->data);
 }
 
 static void fetch_all_variable_names(exodus_file_t* file)
@@ -285,6 +291,7 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
     // Did that work? If not, try the serial creator.
     if (file->ex_id < 0)
     {
+      exerrval = 0;
       file->ex_id = ex_create(filename, mode, &real_size,
                               &file->ex_real_size);
     }
@@ -332,13 +339,16 @@ static exodus_file_t* open_exodus_file(MPI_Comm comm,
         file->num_edges = mesh_info.num_edge;
         file->num_elem_blocks = mesh_info.num_elem_blk;
         file->elem_block_ids = polymec_malloc(sizeof(int) * file->num_elem_blocks);
-        ex_get_ids(file->ex_id, EX_ELEM_BLOCK, file->elem_block_ids);
+        if (file->num_elem_blocks > 0)
+          ex_get_ids(file->ex_id, EX_ELEM_BLOCK, file->elem_block_ids);
         file->num_face_blocks = mesh_info.num_face_blk;
         file->face_block_ids = polymec_malloc(sizeof(int) * file->num_face_blocks);
-        ex_get_ids(file->ex_id, EX_FACE_BLOCK, file->face_block_ids);
+        if (file->num_face_blocks > 0)
+          ex_get_ids(file->ex_id, EX_FACE_BLOCK, file->face_block_ids);
         file->num_edge_blocks = mesh_info.num_edge_blk;
         file->edge_block_ids = polymec_malloc(sizeof(int) * file->num_edge_blocks);
-        ex_get_ids(file->ex_id, EX_EDGE_BLOCK, file->edge_block_ids);
+        if (file->num_edge_blocks > 0)
+          ex_get_ids(file->ex_id, EX_EDGE_BLOCK, file->edge_block_ids);
         file->num_elem_sets = mesh_info.num_elem_sets;
         file->num_face_sets = mesh_info.num_face_sets;
         file->num_edge_sets = mesh_info.num_edge_sets;
@@ -676,10 +686,10 @@ static void fetch_set(exodus_file_t* file,
 {
   char set_name[MAX_NAME_LENGTH+1];
   ex_get_name(file->ex_id, set_type, (ex_entity_id)set_id, set_name);
-  size_t set_size;
+  int set_size;
   int num_dist_factors;
   ex_get_set_param(file->ex_id, set_type, (ex_entity_id)set_id, &set_size, &num_dist_factors);
-  int* set = create_set(mesh, set_name, set_size);
+  int* set = create_set(mesh, set_name, (size_t)set_size);
   ex_get_set(file->ex_id, set_type, (ex_entity_id)set_id, set, NULL);
 }
 

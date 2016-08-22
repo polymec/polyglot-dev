@@ -9,6 +9,8 @@ endif()
 # We don't hold third-party library code to the same standard of excellence  
 # to which we adhere. :-)
 string(REPLACE "-Werror " " " CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+string(REPLACE "-Weverything " " " CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
+string(REPLACE "-Wmissing-prototypes " " " CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
 
 # Build the netcdf library.
 set(NETCDF_LIBRARY "${PROJECT_BINARY_DIR}/lib/libnetcdf${LIB_SUFFIX}")
