@@ -48,6 +48,7 @@
 #pragma GCC diagnostic ignored "-Wconversion"
 #pragma clang diagnostic ignored "-Wfloat-conversion"
 #pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
 
 #include "exodusII.h"
 
