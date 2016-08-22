@@ -8,6 +8,10 @@
 #include "core/array.h"
 #include "polyglot/exodus_file.h"
 
+// This warning couples Doxygen \deprecated tags to code in Exodus, 
+// which we need to disable to continue our work.
+#pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
+
 #if POLYMEC_HAVE_MPI
 #include "mpi.h"
 #define PARALLEL_AWARE_EXODUS 1
@@ -19,10 +23,6 @@
 #if !defined NC_HAS_NC4 || !NC_HAS_NC4
 #error "The NetCDF library used does not support NetCDF4."
 #endif
-
-// This warning couples Doxygen \deprecated tags to code in Exodus, 
-// which we need to disable to continue our work.
-#pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
 
 #include "exodusII.h"
 #include "exodusII_int.h"
