@@ -60,6 +60,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wdocumentation-deprecated-sync"
+
 #include "exodusII.h"
 
 int main (int argc, char **argv)

@@ -42,6 +42,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
+
 #include "exodusII.h"
 
 int main (int argc, char **argv)
