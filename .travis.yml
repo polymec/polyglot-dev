@@ -63,6 +63,9 @@ deploy:
   upload-dir: polyglot-dev
   acl: public_read
 
+before_script:
+  - if [ "$MPI" = "1" ]; then export CC="mpicc"; fi
+
 script: 
   - pushd $HOME && wget https://s3-us-west-2.amazonaws.com/polymec-dev.travis-ci/polymec-dev/polymec-$TRAVIS_OS_NAME-$CC-debug%3D$DEBUG-mpi%3D$MPI-shared%3D$SHARED.tar.gz && tar xzvf polymec-$TRAVIS_OS_NAME-$CC-debug=$DEBUG-mpi=$MPI-shared=$SHARED.tar.gz && popd
   - make config polymec="$HOME/polymec-$TRAVIS_OS_NAME-$CC-debug=$DEBUG-mpi=$MPI-shared=$SHARED" && make -j4 install && make test 

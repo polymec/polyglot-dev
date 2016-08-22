@@ -13,7 +13,9 @@ endif()
 if (BUILD_SHARED_LIBS)
   target_link_libraries(polyglot ${POLYGLOT_LIBRARIES})
 endif()
-add_dependencies(polyglot update_version_h) # <-- needed on Mac(?!)
+
+# polyglot_version.h is needed by polyglot.c.
+add_dependencies(polyglot update_version_h) 
 
 if (HAVE_POLYAMRI)
   set(POLYGLOT_LIBRARIES polyglot;${POLYGLOT_LIBRARIES};${POLYAMRI_LIBRARIES} PARENT_SCOPE)
