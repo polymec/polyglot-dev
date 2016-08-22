@@ -995,7 +995,7 @@ fe_mesh_t* fe_mesh_from_mesh(mesh_t* fv_mesh,
         for (int f = 0; f < num_elem_faces[i]; ++f, ++offset)
           elem_faces[offset+f] = fv_mesh->cell_faces[fv_mesh->cell_face_offsets[block_tag[i]+f]];
       }
-      fe_block_t* block = polyhedral_fe_block_new((size_t)num_elem, num_elem_faces, fv_mesh->cell_faces);
+      fe_block_t* block = polyhedral_fe_block_new((int)num_elem, num_elem_faces, fv_mesh->cell_faces);
       fe_mesh_add_block(fe_mesh, tag_name, block);
       polymec_free(num_elem_faces);
       polymec_free(elem_faces);
